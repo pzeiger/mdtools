@@ -1,0 +1,3 @@
+[submodule "pwtools"]
+	path = pwtools
+	url = https://github.com/elcorto/pwtools
