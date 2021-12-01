@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 from pwtools import pydos
 from pwtools import signal
 from scipy.signal import gaussian
-import trajectory as traj
+from mdtools import trajectory as traj
 import multiprocessing
 import glob
 import IPython
 import sys
-
+from mdtools import io as mdio
 
 
 def get_atomlists_from_plane(trj, planedir, tol=0.1):
@@ -112,7 +112,7 @@ def pdos(pdos_input, trj):
             ppdos['planes'][str(plane)] = []
             
             for atomlist in atomlists:
-                pdoss = compute_pdos(trj, atomlists)
+                pdoss = compute_pdos(trj, atomlists, split_natoms=pdos_input['split_natoms'])
                 ppdos['planes'][str(plane)].append(pdoss)
     
     if 'atomlists' in pdos_input.keys():
@@ -122,77 +122,114 @@ def pdos(pdos_input, trj):
         ppdos['atomlists'] = []
         
         for atomlist in pdos_input['atomlists']:
-            pdoss = compute_pdos(trj, atomlists)
+            pdoss = compute_pdos(trj, atomlists, split_natoms=pdos_input['split_natoms'])
             ppdos['atomlists'].append(pdoss)
     
     if 'attypes' in pdos_input.keys():
         print('attypes')
-        ppdos['attypes'] = []
+        ppdos['attypes'] = {}
         
         for typ in pdos_input['attypes']:
             atomlist = trj.get_atids_by_attypes(typ)
-            pdoss = compute_pdos(trj, atomlist)
-            ppdos['attypes'].append(pdoss)
+            pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
+            ppdos['attypes'][str(typ)] = pdoss
     
     
     return ppdos
 
 
 
-def compute_pdos(trj, atomlist=[]):
+def compute_pdos(trj, atomlist=[], split_natoms=None):
     """
     """
-    pdos = {}
     
     # Check for empty array
     if len(atomlist) == 0:
         print('compute_pdos(): no list of atoms was specified.')
-        return pdos
+        return {}
     
-    vel, vel_x, vel_y, vel_z = trj.get_velocities(atomlist)
-    masses = trj.get_masses(atomlist)
+    # split up the computation to avoid using too much memory
+    print(atomlist)
+    print(np.ceil(atomlist.shape[0] / split_natoms))
+    if split_natoms:
+        atomlists = np.array_split(atomlist, np.ceil(atomlist.shape[0] / split_natoms))
+    else:
+        atomlists = [atomlist,]
     
-    print(vel.shape)
-    print(masses.shape)
+    print(atomlists)
     
-    dt = trj.dt * trj.samplensteps
-    pdos['tot']  = pydos.pdos(vel=vel,   dt=dt, m=masses, area=1  ,full_out=True)
-    pdos['x']    = pydos.pdos(vel=vel_x, dt=dt, m=masses, area=1/3, full_out=True)
-    pdos['y']    = pydos.pdos(vel=vel_y, dt=dt, m=masses, area=1/3, full_out=True)
-    pdos['z']    = pydos.pdos(vel=vel_z, dt=dt, m=masses, area=1/3, full_out=True)
-    pdos['atomlist'] = atomlist
-    pdos['masses'] = masses
+    pdoss = []
+    
+    for al in atomlists:
+        
+        vel, vel_x, vel_y, vel_z = trj.get_velocities(al)
+        masses = trj.get_masses(al)
+        
+        print(vel.shape)
+        print(masses.shape)
+        
+        dt = trj.dt * trj.samplensteps
+        
+        pdos_tmp = {}
+        pdos_tmp['tot']  = pydos.pdos(vel=vel,   dt=dt, m=masses, area=1  ,full_out=True)
+        pdos_tmp['x']    = pydos.pdos(vel=vel_x, dt=dt, m=masses, area=1/3, full_out=True)
+        pdos_tmp['y']    = pydos.pdos(vel=vel_y, dt=dt, m=masses, area=1/3, full_out=True)
+        pdos_tmp['z']    = pydos.pdos(vel=vel_z, dt=dt, m=masses, area=1/3, full_out=True)
+        pdos_tmp['atomlist'] = al
+        pdos_tmp['masses'] = masses
+        
+        pdoss.append(pdos_tmp)
+    
+    pdos = merge_pdoss(pdoss)
+    
     
     return pdos
+
+
+
+def merge_pdoss(pdoss):
+    """
+    """
+    pdos = {}
+    
+    pdos['tot']      = list(pdoss[0]['tot'])
+    pdos['x']        = list(pdoss[0]['x'])
+    pdos['y']        = list(pdoss[0]['y'])
+    pdos['z']        = list(pdoss[0]['z'])
+    pdos['atomlist'] = list(pdoss[0]['atomlist'])
+    pdos['masses']   = list(pdoss[0]['masses'])
+    
+    for el in pdoss[1:]:
+        
+        pdos['atomlist'] = np.concatenate((pdos['atomlist'], el['atomlist']))
+        pdos['masses'] = np.concatenate((pdos['atomlist'], el['masses']))
+        
+        for component in ('x', 'y', 'z', 'tot'):
+            print(pdos[component][1])
+            pdos[component][1] += el[component][1]
+            pdos[component][3] += el[component][3]
+    
+    
+    return pdos
+
 
 
 
 def process_input(inputfile):
     """
     """
-    recognized_strings = ('planes', 'atomlists', 'attypes', 'trjfile')
+    recognized_strings = ('planes', 
+                          'atomlists',
+                          'attypes',
+                          'trjfile',
+                          'split_natoms',
+                          'outputfile',
+                          'compressed',)
     
-    pdos_input = {}
+    # Get settings from file
+    pdos_input = mdio.inputfile2dict(inputfile, recognized_strings)
     
-    with open(inputfile, 'r') as fh:
-        for line in fh: 
-            tmp = line.strip().split()
-            print(tmp)
-            if tmp == []:
-                continue
-            elif tmp[0] == '':
-                continue
-            elif tmp[0] in recognized_strings:
-                identifier = tmp[0]
-            else:
-                if identifier not in pdos_input.keys():
-                    pdos_input[identifier] = []
-                print(len(tmp))
-                if len(tmp) == 1:
-                    pdos_input[identifier].append(tmp[0])
-                else:
-                    pdos_input[identifier].append(tmp)
-    
+    # Clean up settings
     tmp = []
     if 'atomlists' in pdos_input.keys():
         for atomlist in pdos_input['atomlists']:
@@ -209,9 +246,18 @@ def process_input(inputfile):
             else:
                 tmp.append([attype,])
         pdos_input['attypes'] = tmp
-
+    
     if 'trjfile' in pdos_input.keys():
         pdos_input['trjfile'] = pdos_input['trjfile'][0]
+    
+    if 'split_natoms' in pdos_input.keys():
+        pdos_input['split_natoms'] = int(pdos_input['split_natoms'][-1])
+    
+    if 'compressed' in pdos_input.keys():
+        pdos_input['compressed'] = bool(pdos_input['compressed'][-1])
+    else:
+        pdos_input['compressed'] = False
+    
     return pdos_input
 
 
@@ -248,79 +294,13 @@ def main(argv):
     
     ppdos = pdos(pdos_input, trj)
     
-    np.savez_compressed('trj_pdos.npz', pdos_input, ppdos, ppdos=ppdos)
+    # Save pdos information to numpy archive
+    print(pdos_input['compressed'])
+    if pdos_input['compressed']:
+        np.savez_compressed('trj_pdos.npz', pdos_input=pdos_input, ppdos=ppdos)
+    else:
+        np.savez('trj_pdos.npz', pdos_input=pdos_input, ppdos=ppdos)
     
-#    with open(inputfile, 'r') as fh:
-
-#    pdos_offAPB, pdos_offAPB_x, pdos_offAPB_y, pdos_offAPB_z = compute_pdos(data, prop_trjsamp['atomlist_offAPB'], prop_trjsamp['dt'])
-#    pdos_atAPB,  pdos_atAPB_x, pdos_atAPB_y,  pdos_atAPB_z  = compute_pdos(data, prop_trjsamp['atomlist_atAPB'], prop_trjsamp['dt'])
-    
-#    
-#    print(dname)
-#    
-#    np.savetxt(dname + 'pdos_offAPB_nsteps%i.dat' % data.shape[0],
-#               np.array([pdos_offAPB[0],
-#                         pdos_offAPB[1],
-#                         pdos_offAPB_x[1],
-#                         pdos_offAPB_y[1],
-#                         pdos_offAPB_z[1], ]).swapaxes(0,1))
-#    
-#    np.savetxt(dname + 'pdos_atAPB_nsteps%i.dat' % data.shape[0],
-#               np.array([pdos_atAPB[0],
-#                         pdos_atAPB[1],
-#                         pdos_atAPB_x[1],
-#                         pdos_atAPB_y[1],
-#                         pdos_atAPB_z[1], ]).swapaxes(0,1))
-#    
-#    np.savetxt(dname + 'pdos_offAPB_nsteps%i_full.dat' % data.shape[0],
-#               np.array([pdos_offAPB[2][:pdos_offAPB[4]],
-#                         pdos_offAPB[3][:pdos_offAPB[4]],
-#                         pdos_offAPB_x[3][:pdos_offAPB[4]],
-#                         pdos_offAPB_y[3][:pdos_offAPB[4]],
-#                         pdos_offAPB_z[3][:pdos_offAPB[4]], ]).swapaxes(0,1))
-#    
-#    np.savetxt(dname + 'pdos_atAPB_nsteps%i_full.dat' % data.shape[0],
-#               np.array([pdos_atAPB[2][:pdos_atAPB[4]],
-#                         pdos_atAPB[3][:pdos_atAPB[4]],
-#                         pdos_atAPB_x[3][:pdos_atAPB[4]],
-#                         pdos_atAPB_y[3][:pdos_atAPB[4]],
-#                         pdos_atAPB_z[3][:pdos_atAPB[4]], ]).swapaxes(0,1))
-#    
-#    planes_to_calc = []
-#    if prop_trjsamp['atomlist_planes'] != False:
-#        planes_to_calc = [key for key in prop_trjsamp['atomlist_planes']]
-#    
-#    for char in planes_to_calc:
-#        tmp   = {}
-#        
-#        for plane in prop_trjsamp['atomlist_planes'][char]:
-#            pdos, pdos_x, pdos_y, pdos_z = compute_pdos(data, plane, prop_trjsamp['dt'])
-#            
-#            if tmp == {}:
-#                tmp['tot'] = [pdos[0],]
-#                tmp['x']   = [pdos[0],]
-#                tmp['y']   = [pdos[0],]
-#                tmp['z']   = [pdos[0],]
-#            print(tmp)
-#
-#            tmp['tot'] = tmp['tot'].append(pdos[1])
-#            tmp['x']   = tmp['x'].append(pdos_x[1])
-#            tmp['y']   = tmp['y'].append(pdos_y[1])
-#            tmp['z']   = tmp['z'].append(pdos_z[1])
-#        
-#        tmp['tot'] = np.array(tmp['tot']).swapaxes(0,1)
-#        tmp['x']   = np.array(tmp['x']).swapaxes(0,1)
-#        tmp['y']   = np.array(tmp['y']).swapaxes(0,1)
-#        tmp['z']   = np.array(tmp['z']).swapaxes(0,1)
-#        
-#        np.savetxt(dname + 'pdos_tot_%s-planes_nsteps%i_full.dat' % (char, data.shape[0]),
-#                   tmp['tot'])
-#        np.savetxt(dname + 'pdos_xcomponent_%s-planes_nsteps%i_full.dat' % (char, data.shape[0]),
-#                   tmp['x'])
-#        np.savetxt(dname + 'pdos_ycomponent_%s-planes_nsteps%i_full.dat' % (char, data.shape[0]),
-#                   tmp['y'])
-#        np.savetxt(dname + 'pdos_zcomponent_%s-planes_nsteps%i_full.dat' % (char, data.shape[0]),
-#                   tmp['z'])
         
     return None
 
