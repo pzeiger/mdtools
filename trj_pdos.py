@@ -105,10 +105,13 @@ def pdos(pdos_input, trj):
     ppdos = {}
     
     if 'planes' in pdos_input.keys():
-        print('planes')
+        print('\n', 'planes')
+        print(pdos_input['planes'])
         
         ppdos['planes'] = {}
+        
         for plane in pdos_input['planes']:
+            print('plane:', plane)
             atomlists = get_atomlists_from_plane(trj, plane)
             ppdos['planes'][str(plane)] = []
             
@@ -116,22 +119,27 @@ def pdos(pdos_input, trj):
                 pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
                 ppdos['planes'][str(plane)].append(pdoss)
     
+
     if 'atomlists' in pdos_input.keys():
-        print('atomlists')
+        print('\n', 'atomlists')
         print(pdos_input['atomlists'])
         
         ppdos['atomlists'] = []
         
         for atomlist in pdos_input['atomlists']:
+            print('atomlist:', atomlist)
             pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
             ppdos['atomlists'].append(pdoss)
-    
-    sys.exit()
+   
+
     if 'attypes' in pdos_input.keys():
-        print('attypes')
+        print('\n', 'attypes')
+        print(pdos_input['attypes'])
+        
         ppdos['attypes'] = {}
         
         for typ in pdos_input['attypes']:
+            print('attype:', typ)
             atomlist = trj.get_atids_by_attypes(typ)
             pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
             ppdos['attypes'][str(typ)] = pdoss
