@@ -173,8 +173,8 @@ def compute_pdos(trj, atomlist=[], split_natoms=None):
         vel, vel_x, vel_y, vel_z = trj.get_velocities(al)
         masses = trj.get_masses(al)
         
-        print(vel.shape)
-        print(masses.shape)
+#        print(vel.shape)
+#        print(masses.shape)
         
         dt = trj.dt * trj.samplensteps
         
@@ -210,7 +210,7 @@ def merge_pdoss(pdoss):
     pdos['masses']   = list(pdoss[0]['masses'])
     
     for el in pdoss[1:]:
-        print(el['masses'])
+#        print(el['masses'])
         pdos['atomlist'] = np.concatenate((pdos['atomlist'], el['atomlist']))
         pdos['masses'] = np.concatenate((pdos['masses'], el['masses']))
         
