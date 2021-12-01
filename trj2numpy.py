@@ -5,7 +5,7 @@ import numpy as np
 import sys
 import scipy.constants as constants
 from distutils.util import strtobool
-import trajectory as traj
+from mdtools import trajectory as traj
 
 
 def read_input(trj_prop, argv):
