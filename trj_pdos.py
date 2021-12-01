@@ -123,7 +123,7 @@ def pdos(pdos_input, trj):
         ppdos['atomlists'] = []
         
         for atomlist in pdos_input['atomlists']:
-            pdoss = compute_pdos(trj, atomlists, split_natoms=pdos_input['split_natoms'])
+            pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
             ppdos['atomlists'].append(pdoss)
     
     if 'attypes' in pdos_input.keys():
