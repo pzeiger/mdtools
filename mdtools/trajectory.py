@@ -3,7 +3,6 @@
 import numpy as np
 #import matplotlib.pyplot as plt
 import sys
-import scipy.constants as constants
 from distutils.util import strtobool
 
 
