@@ -210,9 +210,9 @@ def merge_pdoss(pdoss):
     pdos['masses']   = list(pdoss[0]['masses'])
     
     for el in pdoss[1:]:
-        
+        print(el['masses'])
         pdos['atomlist'] = np.concatenate((pdos['atomlist'], el['atomlist']))
-        pdos['masses'] = np.concatenate((pdos['atomlist'], el['masses']))
+        pdos['masses'] = np.concatenate((pdos['masses'], el['masses']))
         
         for component in ('x', 'y', 'z', 'tot'):
             pdos[component][1] += el[component][1]
