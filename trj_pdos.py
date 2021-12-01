@@ -118,14 +118,17 @@ def pdos(pdos_input, trj):
     
     if 'atomlists' in pdos_input.keys():
         print('atomlists')
-        print(pdos_input['planes'])
+        print(pdos_input['atomlists'])
         
         ppdos['atomlists'] = []
         
         for atomlist in pdos_input['atomlists']:
+            print(atomlist)
+            print(type(atomlist))
             pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
             ppdos['atomlists'].append(pdoss)
     
+    sys.exit()
     if 'attypes' in pdos_input.keys():
         print('attypes')
         ppdos['attypes'] = {}
@@ -143,13 +146,16 @@ def compute_pdos(trj, atomlist=[], split_natoms=None):
     """
     """
     
+    if not isinstance(atomlist, np.ndarray):
+        atomlist = np.ndarray(atomlist)
+    
     # Check for empty array
-    if len(atomlist) == 0:
+    if atomlist.size==0:
         print('compute_pdos(): no list of atoms was specified.')
         return {}
     
     # split up the computation to avoid using too much memory
-    if split_natoms:
+    if split_natoms and atomlist.size > split_natoms:
         atomlists = np.array_split(atomlist, np.ceil(atomlist.shape[0] / split_natoms))
     else:
         atomlists = [atomlist,]
@@ -176,8 +182,10 @@ def compute_pdos(trj, atomlist=[], split_natoms=None):
         
         pdoss.append(pdos_tmp)
     
-    pdos = merge_pdoss(pdoss)
-    
+    if len(pdoss) == 1:
+        pdos = pdoss[0]
+    else:
+        pdos = merge_pdoss(pdoss)
     
     return pdos
 
