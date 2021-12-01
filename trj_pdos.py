@@ -258,6 +258,9 @@ def process_input(inputfile):
     else:
         pdos_input['compressed'] = False
     
+    if 'outputfile' in pdos_input.keys():
+        pdos_input['outputfile'] = pdos_input['outputfile'][-1]
+    
     return pdos_input
 
 
@@ -268,6 +271,7 @@ def main(argv):
     
     inputfile = 'pdos.in'
     fname = 'trj.npz'
+    fout = 'trj_pdos.npz'
     
     if len(argv) > 1:
         inputfile = argv[1]
@@ -277,14 +281,19 @@ def main(argv):
     if 'trjfile' in pdos_input.keys():
         fname = pdos_input['trjfile']
     
-    # overwrite fname if given as arg
+    if 'outputfile' in pdos_input.keys():
+        fout = pdos_input['outputfile']
+    
+    # overwrite fname and fout if given as arg
     if len(argv) > 2:
         fname = argv[2]
+    
+    if len(argv) > 3:
+        fout = argv[3]
     
     pdos_input['dname'] = '/'.join(fname.split('/')[:-1])
     if pdos_input['dname'] != '':
         pdos_input['dname'] = './' + pdos_input['dname'] + '/'
-    
     
     print(pdos_input)
     
@@ -297,11 +306,11 @@ def main(argv):
     # Save pdos information to numpy archive
     print(pdos_input['compressed'])
     if pdos_input['compressed']:
-        np.savez_compressed('trj_pdos.npz', pdos_input=pdos_input, ppdos=ppdos)
+        np.savez_compressed(pdos_input['dname'] + fout, pdos_input=pdos_input, ppdos=ppdos)
     else:
-        np.savez('trj_pdos.npz', pdos_input=pdos_input, ppdos=ppdos)
+        np.savez(pdos_input['dname'] + fout, pdos_input=pdos_input, ppdos=ppdos)
     
-        
+    
     return None
 
 
