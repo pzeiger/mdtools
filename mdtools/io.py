@@ -8,7 +8,7 @@ def inputfile2dict(inputfile, recognized_strings):
     with open(inputfile, 'r') as fh:
         for line in fh: 
             tmp = line.strip().split()
-            print(tmp)
+#            print(tmp)
             if tmp == []:
                 continue
             elif tmp[0] == '':
@@ -18,12 +18,12 @@ def inputfile2dict(inputfile, recognized_strings):
             else:
                 if identifier not in out.keys():
                     out[identifier] = []
-                print(len(tmp))
+#                print(len(tmp))
                 if len(tmp) == 1:
                     out[identifier].append(tmp[0])
                 else:
                     out[identifier].append(tmp)
-    print(out)
+    
     return out
 
 

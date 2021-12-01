@@ -13,6 +13,7 @@ import sys
 from mdtools import io as mdio
 
 
+
 def get_atomlists_from_plane(trj, planedir, tol=0.1):
     """
     tol      tolerance in angstroms
@@ -112,7 +113,7 @@ def pdos(pdos_input, trj):
             ppdos['planes'][str(plane)] = []
             
             for atomlist in atomlists:
-                pdoss = compute_pdos(trj, atomlists, split_natoms=pdos_input['split_natoms'])
+                pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
                 ppdos['planes'][str(plane)].append(pdoss)
     
     if 'atomlists' in pdos_input.keys():
@@ -134,7 +135,6 @@ def pdos(pdos_input, trj):
             pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
             ppdos['attypes'][str(typ)] = pdoss
     
-    
     return ppdos
 
 
@@ -149,14 +149,10 @@ def compute_pdos(trj, atomlist=[], split_natoms=None):
         return {}
     
     # split up the computation to avoid using too much memory
-    print(atomlist)
-    print(np.ceil(atomlist.shape[0] / split_natoms))
     if split_natoms:
         atomlists = np.array_split(atomlist, np.ceil(atomlist.shape[0] / split_natoms))
     else:
         atomlists = [atomlist,]
-    
-    print(atomlists)
     
     pdoss = []
     
@@ -205,13 +201,11 @@ def merge_pdoss(pdoss):
         pdos['masses'] = np.concatenate((pdos['atomlist'], el['masses']))
         
         for component in ('x', 'y', 'z', 'tot'):
-            print(pdos[component][1])
             pdos[component][1] += el[component][1]
             pdos[component][3] += el[component][3]
     
     
     return pdos
-
 
 
 
@@ -299,17 +293,15 @@ def main(argv):
     
     # Load the trajectory object
     trj = traj.npz2trj(fname)
-    
-    
+   
+    # Compute the (projected) PDOSs
     ppdos = pdos(pdos_input, trj)
     
     # Save pdos information to numpy archive
-    print(pdos_input['compressed'])
     if pdos_input['compressed']:
         np.savez_compressed(pdos_input['dname'] + fout, pdos_input=pdos_input, ppdos=ppdos)
     else:
         np.savez(pdos_input['dname'] + fout, pdos_input=pdos_input, ppdos=ppdos)
-    
     
     return None
 
