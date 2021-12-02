@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import matplotlib.pyplot as plt
 from pwtools import pydos
 from pwtools import signal
-from scipy.signal import gaussian
 from mdtools import trajectory as traj
+from mdtools import io as mdio
 import multiprocessing
 import glob
-import IPython
 import sys
-from mdtools import io as mdio
 
 
 
