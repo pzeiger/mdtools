@@ -206,15 +206,24 @@ def merge_pdoss(pdoss):
     pdos['atomlist'] = list(pdoss[0]['atomlist'])
     pdos['masses']   = list(pdoss[0]['masses'])
     
+    pdos['tot'][1] *= len(pdos['masses'])
+    pdos['x'][1] *= len(pdos['masses'])
+    pdos['y'][1] *= len(pdos['masses'])
+    pdos['z'][1] *= len(pdos['masses'])
+    
     for el in pdoss[1:]:
 #        print(el['masses'])
         pdos['atomlist'] = np.concatenate((pdos['atomlist'], el['atomlist']))
         pdos['masses'] = np.concatenate((pdos['masses'], el['masses']))
         
         for component in ('x', 'y', 'z', 'tot'):
-            pdos[component][1] += el[component][1]
+            pdos[component][1] += el[component][1] * len(el['masses'])
             pdos[component][3] += el[component][3]
     
+    pdos['tot'][1] /= len(pdos['masses'])
+    pdos['x'][1] /= len(pdos['masses'])
+    pdos['y'][1] /= len(pdos['masses'])
+    pdos['z'][1] /= len(pdos['masses'])
     
     return pdos
 
@@ -253,7 +262,7 @@ def process_input(inputfile):
         pdos_input['attypes'] = tmp
     
     if 'trjfile' in pdos_input.keys():
-        pdos_input['trjfile'] = pdos_input['trjfile'][0]
+        pdos_input['trjfile'] = pdos_input['trjfile'][-1]
     
     if 'split_natoms' in pdos_input.keys():
         pdos_input['split_natoms'] = int(pdos_input['split_natoms'][-1])
