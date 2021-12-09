@@ -252,6 +252,8 @@ def process_input(inputfile):
             tmp[str(atomlist[0])] = np.double(atomlist[1])
         
         pdos_input['attype2mass'] = tmp
+    else:
+        pdos_input['attype2mass'] = None
     
     tmp = []
     if 'atomlists' in pdos_input.keys():
