@@ -238,18 +238,18 @@ def process_input(inputfile):
                           'trjfile',
                           'split_natoms',
                           'outputfile',
-                          'compressed'
+                          'compressed',
                           'attype2mass',)
     
     # Get settings from file
     pdos_input = mdio.inputfile2dict(inputfile, recognized_strings)
     
     # Clean up settings
-    tmp = []
+    tmp = {}
     if 'attype2mass' in pdos_input.keys():
         for atomlist in pdos_input['attype2mass']:
             
-            tmp.append(np.array(atomlist, dtype=np.int_))
+            tmp[str(atomlist[0])] = np.double(atomlist[1])
         
         pdos_input['attype2mass'] = tmp
     
