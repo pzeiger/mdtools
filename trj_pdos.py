@@ -238,12 +238,21 @@ def process_input(inputfile):
                           'trjfile',
                           'split_natoms',
                           'outputfile',
-                          'compressed',)
+                          'compressed'
+                          'attype2mass',)
     
     # Get settings from file
     pdos_input = mdio.inputfile2dict(inputfile, recognized_strings)
     
     # Clean up settings
+    tmp = []
+    if 'attype2mass' in pdos_input.keys():
+        for atomlist in pdos_input['attype2mass']:
+            
+            tmp.append(np.array(atomlist, dtype=np.int_))
+        
+        pdos_input['attype2mass'] = tmp
+    
     tmp = []
     if 'atomlists' in pdos_input.keys():
         for atomlist in pdos_input['atomlists']:
@@ -312,7 +321,7 @@ def main(argv):
     print(pdos_input)
     
     # Load the trajectory object
-    trj = traj.npz2trj(fname)
+    trj = traj.npz2trj(fname, attype2mass=pdos_input['attype2mass'])
    
     # Compute the (projected) PDOSs
     ppdos = pdos(pdos_input, trj)

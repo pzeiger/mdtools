@@ -7,7 +7,7 @@ from distutils.util import strtobool
 
 
 
-def npz2trj(fname):
+def npz2trj(fname, attype2mass=None):
     """
     """
     
@@ -17,7 +17,8 @@ def npz2trj(fname):
     data0 = npzfile['trj_data0']
     header = npzfile['trj_header']
     data = npzfile['trj_data']
-    attype2mass = npzfile['attype2mass'].item()
+    if attype2mass is None:
+        attype2mass = npzfile['attype2mass'].item()
 
 #    print(trj_prop)
 #    print(header0)
