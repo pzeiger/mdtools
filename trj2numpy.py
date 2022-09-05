@@ -87,7 +87,7 @@ def main(argv):
     trj_prop['trjtype'] = traj.determine_filetype(trj_prop['trjfile'])
     
     trj_prop = read_input(trj_prop, argv)
-    
+
     trj = traj.data_from_trajectory(trj_prop)
     
 

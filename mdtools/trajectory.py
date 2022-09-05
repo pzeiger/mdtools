@@ -17,20 +17,25 @@ def npz2trj(fname, attype2mass=None):
     data0 = npzfile['trj_data0']
     header = npzfile['trj_header']
     data = npzfile['trj_data']
+    initheader = npzfile['trj_initheader']
+    initdata = npzfile['trj_initdata']
+    
     if attype2mass is None:
         attype2mass = npzfile['attype2mass'].item()
-
+    
 #    print(trj_prop)
 #    print(header0)
 #    print(header)
 #    print(data0)
 #    print(data)
 #    print(masses)
-
+    
     if trj_prop['trjtype'] == 'ipixyz':
-        trj = IpixyzTrj(trj_prop, header0, header, data0, data, attype2mass)
+        trj = IpixyzTrj(trj_prop, header0=header0, header=header, data0=data0,
+                        data=data, attype2mass=attype2mass)
     elif trj_prop['trjtype'] == 'lammpstrj':
-        trj = LammpsTrj(trj_prop, header0, header, data0, data, attype2mass)
+        trj = LammpsTrj(trj_prop, header0=header0, header=header, initheader=initheader,
+                        data0=data0, data=data, initdata=initdata, attype2mass=attype2mass)
     
     return trj
 
@@ -64,7 +69,7 @@ def data_from_trajectory(trj_prop):
 class Trajectory():
     """ Template class for trajectories
     """
-    def __init__(self, trj_prop, header0=None, header=[], data0=None, data=[], attype2mass={}):
+    def __init__(self, trj_prop, header0=None, header=[], data0=None, data=[], initdata=None, attype2mass={}):
         
         self.dt = trj_prop['dt']
         self.nsteps = trj_prop['nsteps']
@@ -89,7 +94,15 @@ class Trajectory():
         self.header = header
         self.data0 = data0
         self.data = data
+        self.data0 = data0
+        self.initdata = initdata
         self.attype2mass = attype2mass
+        
+        print('alive', self.initdata)
+        
+        if self.initdatafile and self.initdata is None:
+            print('alive', self.initdatafile)
+            self.process_initdata()
         
         if self.header0 is None and self.header == [] and self.data0 is None and self.data == []:
             with open(self.trjfile, 'r') as self.fh:
@@ -115,13 +128,21 @@ class Trajectory():
         """
         """
         pass 
-   
     
-
+    
+    
     def find_attypes_masses(self):
         """
         """
         pass
+    
+    
+
+    def process_initdata(self):
+        """
+        """
+        pass
+    
     
     
     def process_trjfile(self):
@@ -235,17 +256,20 @@ class Trajectory():
             'trjtype':       determine_filetype(self.trjfile),
             'compressed':    self.compressed,
             'samplensteps':  self.samplensteps,
+            'initdatafile':  self.initdatafile,
         }
         
         if self.compressed:
             np.savez_compressed(fname, trj_prop=trj_prop, 
                                 trj_data0=self.data0, trj_data=self.data,
                                 trj_header0=self.header0, trj_header=self.header,
+                                trj_initheader=self.initheader, trj_initdata=self.initdata,
                                 attype2mass=self.attype2mass)
         else:
             np.savez(fname, trj_prop=trj_prop, 
                      trj_data0=self.data0, trj_data=self.data,
                      trj_header0=self.header0, trj_header=self.header,
+                     trj_initheader=self.initheader, trj_initdata=self.initdata,
                      attype2mass=self.attype2mass)
 
 
@@ -255,7 +279,8 @@ class LammpsTrj(Trajectory):
     """
     def __init__(self, trj_prop, header0=None, header=[], data0=None, data=[], attype2mass={}):
         self.header_lines = 9
-        super().__init__(trj_prop, header0, header, data0, data, attype2mass)
+        super().__init__(trj_prop, header0=header0, header=header, data0=data0,
+                         data=data, attype2mass=attype2mass)
     
     def process_timestep_header(self):
         """ Process lammps trajectory header of form:
@@ -291,6 +316,113 @@ class LammpsTrj(Trajectory):
             data = data[np.isin(data['id'], self.atomlist)]
         data.sort(order='id')
         return data
+    
+    
+    
+    def process_initdata(self):
+        """
+        """
+        
+        header = {}
+        masses = {}
+        header['BOX BOUNDS'] = []
+        header['BOX'] = {
+                'xy': .0,
+                'xz': .0,
+                'yz': .0,
+        }
+        save = None
+        
+        with open(self.initdatafile, 'r') as fh:
+            
+            for line in fh:
+                tmp = line.strip().split()
+                if tmp == []:
+                    continue
+                if tmp[0] == 'Masses':
+                    save = 'Masses'
+                    continue
+                elif tmp[0] == 'Atoms':
+                    save = 'Atoms'
+                    atindex = 0
+                    if tmp[1] == '#':
+                        atomstyle = tmp[2]
+                    else:
+                        atomstyle = tmp[1]
+                    if atomstyle.lower() == 'atomic':
+                        header['ATOMS'] = ['id', 'type', 'xu', 'yu', 'zu']
+                        dtype={'names': header['ATOMS'],
+                               'formats': ('u4', 'u1', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8')}
+                        
+                        data = np.array(np.empty(header['NUMBER OF ATOMS']), dtype=dtype)
+                        print(data.shape)
+                    else:
+                        raise NotImplementedError('Atom style %s not understood' % atomstyle)
+                    continue
+                elif tmp[0] == 'Velocities':
+                    save = 'Velocities'
+                    continue
+                elif len(tmp) == 2:
+                    if tmp[1].lower() == 'atoms':
+                        header['NUMBER OF ATOMS'] = int(tmp[0])
+                        continue
+                elif len(tmp) == 3:
+                    if tmp[1].lower() == 'atom' and tmp[2].lower() == 'types':
+                        header['NUMBER OF TYPES'] = int(tmp[0])
+                        continue
+                elif len(tmp) == 4:
+                    if tmp[2][1:] == 'lo' and tmp[3][1:] == 'hi':
+                        header['BOX BOUNDS'].append(np.array(tmp[:2], dtype='f8'))
+                        continue
+                    elif tmp[3] == 'xy' and tmp[4] == 'xy' and tmp[5] == 'xy' :
+                        header['BOX'][tmp[3]] = np.double(tmp[0])
+                        header['BOX'][tmp[4]] = np.double(tmp[1])
+                        header['BOX'][tmp[5]] = np.double(tmp[2])
+                        continue
+                    elif save == 'Velocities' or save == 'Atoms':
+                        pass
+                    else:
+                        raise NotImplementedError('Do not understand %s' % ' '.join(tmp))
+#                        save = 'Box'
+                
+                if save == 'Masses':
+                    masses[tmp[0]] = np.double(tmp[1])
+                elif save == 'Atoms':
+                    data[atindex]['id'] = np.int(tmp[0])
+                    data[atindex]['type'] = np.int(tmp[1])
+                    data[atindex]['xu'] = np.double(tmp[2])
+                    data[atindex]['yu'] = np.double(tmp[3])
+                    data[atindex]['zu'] = np.double(tmp[4])
+                    atindex += 1
+                    continue
+                elif save == 'Velocities':
+                    continue
+                else:
+                    print(save)
+                    print('Line "%s" not interpreted' % ' '.join(tmp))
+                
+        print(header)
+        
+        header['BOX BOUNDS'] = np.array(header['BOX BOUNDS'], dtype='f8')
+        
+        xx = header['BOX BOUNDS'][0,1]-header['BOX BOUNDS'][0,0]
+        yy = header['BOX BOUNDS'][1,1]-header['BOX BOUNDS'][1,0]
+        zz = header['BOX BOUNDS'][2,1]-header['BOX BOUNDS'][2,0]
+        header['BOX']['xx'] = xx
+        header['BOX']['yy'] = yy
+        header['BOX']['zz'] = zz
+        xy = header['BOX']['xy']
+        xz = header['BOX']['xz']
+        yz = header['BOX']['yz']
+        header['BOX']['matrix'] = np.array([[xx, xy, xz], [0.0, yy, yz], [0.0, 0.0, zz]])
+        
+        self.initdata = data
+        self.initheader = header
+        print(self.initheader)
+        print(self.initdata)
+#        sys.exit()
+        return 
+    
     
     
     def find_attypes_masses(self):
@@ -330,7 +462,9 @@ class IpixyzTrj(Trajectory):
     """
     def __init__(self, trj_prop, header0=None, header=[], data0=None, data=[], attype2mass={}):
         self.header_lines = 2
-        super().__init__(trj_prop, header0, header, data0, data, attype2mass)
+        super().__init__(trj_prop, header0=header0, header=header, data0=data0,
+                         data=data, attype2mass=attype2mass)
+    
     
     
     def process_timestep_header(self):
@@ -348,7 +482,8 @@ class IpixyzTrj(Trajectory):
         header[tmp[1][12].strip(':').split('{')[0]] = tmp[1][12].strip(':').split('{')[-1].strip('}')
         header[tmp[1][13].strip(':').split('{')[0]] = tmp[1][13].strip(':').split('{')[-1].strip('}')
         return header
-   
+    
+    
     
     def process_timestep_data(self, header):
         """
