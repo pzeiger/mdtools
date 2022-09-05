@@ -53,7 +53,7 @@ def read_input(trj_prop, argv):
         trj_prop['compressed'] = bool(strtobool(tmp[6][0]))
     
     if len(tmp) >= 8 and  tmp[7] != ['']:
-        trj_prop['initdatafile'] = tmp[7][0]
+        trj_prop['data0file'] = tmp[7][0]
     
     if len(argv) > 2:
         trj_prop['trjfile'] = argv[1]
@@ -81,7 +81,7 @@ def main(argv):
         'inputfile':     'trj2numpy.in',
         'atomlist':      None,
         'compressed':    False,
-        'initdatafile':  None,
+        'data0file':     None,
     }
     
     trj_prop['trjtype'] = traj.determine_filetype(trj_prop['trjfile'])
@@ -94,12 +94,8 @@ def main(argv):
     print(trj_prop)
     print('trj.data.shape', trj.data.shape)
     
-#    print(trj.header0)
-#    print(trj.header)
-#    print(trj.data0)
-#    print(trj.data)
-#    print(trj.masses)
-
+    print(trj.attype2mass)
+    
     fname = 'trj_nsteps%i_skipnsteps%i_samplensteps%i.npz' % (trj.nsteps, trj.skipnsteps, 
                                                               trj.samplensteps)
     print('\nOutputting trajectory data to %s' % fname)
@@ -110,9 +106,7 @@ def main(argv):
 
 #    print(tmp)
 
-#    print(tmp.header0)
 #    print(tmp.header)
-#    print(tmp.data0)
 #    print(tmp.data)
 
     

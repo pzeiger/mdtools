@@ -17,8 +17,8 @@ def npz2trj(fname, attype2mass=None):
     data0 = npzfile['trj_data0']
     header = npzfile['trj_header']
     data = npzfile['trj_data']
-    initheader = npzfile['trj_initheader']
-    initdata = npzfile['trj_initdata']
+#    initheader = npzfile['trj_initheader']
+#    initdata = npzfile['trj_initdata']
     
     if attype2mass is None:
         attype2mass = npzfile['attype2mass'].item()
@@ -34,8 +34,8 @@ def npz2trj(fname, attype2mass=None):
         trj = IpixyzTrj(trj_prop, header0=header0, header=header, data0=data0,
                         data=data, attype2mass=attype2mass)
     elif trj_prop['trjtype'] == 'lammpstrj':
-        trj = LammpsTrj(trj_prop, header0=header0, header=header, initheader=initheader,
-                        data0=data0, data=data, initdata=initdata, attype2mass=attype2mass)
+        trj = LammpsTrj(trj_prop, header0=header0, header=header,
+                        data0=data0, data=data, attype2mass=attype2mass)
     
     return trj
 
@@ -69,7 +69,7 @@ def data_from_trajectory(trj_prop):
 class Trajectory():
     """ Template class for trajectories
     """
-    def __init__(self, trj_prop, header0=None, header=[], data0=None, data=[], initdata=None, attype2mass={}):
+    def __init__(self, trj_prop, header0=None, header=[], data0=None, data=[], attype2mass={}):
         
         self.dt = trj_prop['dt']
         self.nsteps = trj_prop['nsteps']
@@ -85,31 +85,29 @@ class Trajectory():
             self.atomlist = None
         
         # initial datafile
-        if 'initdatafile' in trj_prop.keys():
-            self.initdatafile = trj_prop['initdatafile']
+        if 'data0file' in trj_prop.keys():
+            self.data0file = trj_prop['data0file']
         else:
-            self.initdatafile = None
+            self.data0file = None
         
         self.header0 = header0
         self.header = header
         self.data0 = data0
         self.data = data
-        self.data0 = data0
-        self.initdata = initdata
         self.attype2mass = attype2mass
         
-        print('alive', self.initdata)
+        print('alive', self.data0)
         
-        if self.initdatafile and self.initdata is None:
-            print('alive', self.initdatafile)
-            self.process_initdata()
+        if self.data0file and self.data0 is None:
+            print('alive', self.data0file)
+            self.process_data0()
         
-        if self.header0 is None and self.header == [] and self.data0 is None and self.data == []:
+        if self.header == [] and self.data == []:
             with open(self.trjfile, 'r') as self.fh:
                 self.process_trjfile()
         
         if self.attype2mass == {}:
-            print('self.initdatafile', self.initdatafile)
+            print('self.data0file', self.data0file)
             try:
                 self.attype2mass = self.find_attypes_masses()
             except:
@@ -138,7 +136,7 @@ class Trajectory():
     
     
 
-    def process_initdata(self):
+    def process_data0(self):
         """
         """
         pass
@@ -148,20 +146,19 @@ class Trajectory():
     def process_trjfile(self):
         """
         """
-        self.header0 = self.process_timestep_header()
-        self.data0 = self.process_timestep_data(header=self.header0)
         nsteps = self.nsteps
         if self.skipnsteps:
 #            nsteps += self.skipnsteps
+            tmpheader = self.process_timestep_header()
             try:
-                for i in range((self.skipnsteps)*(self.header0['NUMBER OF ATOMS']+self.header_lines)):
+                for i in range((self.skipnsteps)*(tmpheader['NUMBER OF ATOMS']+self.header_lines)-self.header_lines):
                     next(self.fh)
             except StopIteration:
                 print('Reached end of file')
                 return None
         
         print('Timestep(s) loaded:')
-        step = 1
+        step = 0
         data = []
         header = []
         while True:
@@ -256,20 +253,18 @@ class Trajectory():
             'trjtype':       determine_filetype(self.trjfile),
             'compressed':    self.compressed,
             'samplensteps':  self.samplensteps,
-            'initdatafile':  self.initdatafile,
+            'data0file':     self.data0file,
         }
         
         if self.compressed:
             np.savez_compressed(fname, trj_prop=trj_prop, 
                                 trj_data0=self.data0, trj_data=self.data,
                                 trj_header0=self.header0, trj_header=self.header,
-                                trj_initheader=self.initheader, trj_initdata=self.initdata,
                                 attype2mass=self.attype2mass)
         else:
             np.savez(fname, trj_prop=trj_prop, 
                      trj_data0=self.data0, trj_data=self.data,
                      trj_header0=self.header0, trj_header=self.header,
-                     trj_initheader=self.initheader, trj_initdata=self.initdata,
                      attype2mass=self.attype2mass)
 
 
@@ -319,7 +314,7 @@ class LammpsTrj(Trajectory):
     
     
     
-    def process_initdata(self):
+    def process_data0(self):
         """
         """
         
@@ -333,7 +328,7 @@ class LammpsTrj(Trajectory):
         }
         save = None
         
-        with open(self.initdatafile, 'r') as fh:
+        with open(self.data0file, 'r') as fh:
             
             for line in fh:
                 tmp = line.strip().split()
@@ -416,10 +411,10 @@ class LammpsTrj(Trajectory):
         yz = header['BOX']['yz']
         header['BOX']['matrix'] = np.array([[xx, xy, xz], [0.0, yy, yz], [0.0, 0.0, zz]])
         
-        self.initdata = data
-        self.initheader = header
-        print(self.initheader)
-        print(self.initdata)
+        self.data0 = data
+        self.header0 = header
+        print(self.header0)
+        print(self.data0)
 #        sys.exit()
         return 
     
@@ -428,8 +423,8 @@ class LammpsTrj(Trajectory):
     def find_attypes_masses(self):
         masses = {}
         
-        if self.initdatafile:
-            with open(self.initdatafile, 'r') as fh:
+        if self.data0file:
+            with open(self.data0file, 'r') as fh:
                 save = False
                 for line in fh:
                     tmp = line.strip().split()
