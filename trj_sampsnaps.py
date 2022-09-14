@@ -8,16 +8,60 @@ import sys
 import os
 from mdtools import io as mdio
 
-
-
-def output_snapshots(data, headers, type2atomicn):
+def mkdir_safe(directory):
     """
     """
-    directory = 'snaps'
     try:
         os.mkdir(directory)
     except FileExistsError:
         pass
+
+
+
+def output_snapshots(data, headers, type2atomicn, style='drprobecel'):
+    """
+    """
+    directory = 'snaps' + '_' + style
+    
+    if style == 'drprobecel':
+        output_snapshots_drprobecel(data, headers, type2atomicn, directory=directory)
+    elif style == 'drprobecel':
+        output_snapshots_multislice(data, headers, type2atomicn, directory=directory)
+    else:
+        raise NotImplementedError('Snapshot output style %s not implemented' % style)
+        
+
+
+
+def output_snapshots_drprobecel(data, headers, type2atomicn, directory):
+    """
+    """
+    mkdir_safe(directory)
+    
+    for dat, head in zip(data, headers):
+        snapname = 'snapshot%07d.cel' % head['TIMESTEP']
+        assert head['NUMBER OF ATOMS'] == dat.shape[0]
+#        print(dat.shape)
+        with open(directory+'/'+snapname, 'w') as fh:
+            dx = head['BOX BOUNDS'][0,1] - head['BOX BOUNDS'][0,0]
+            dy = head['BOX BOUNDS'][1,1] - head['BOX BOUNDS'][1,0]
+            dz = head['BOX BOUNDS'][2,1] - head['BOX BOUNDS'][2,0]
+            fh.write('%.16f %.16f %.16f\n' % (dx, dy, dz))
+            fh.write('%i F\n' % (dat.shape[0]))
+            tmp = np.copy(dat)
+            for el in type2atomicn:
+                tmp['type'][tmp['type'] == int(el[0])] = int(el[1])
+            tmp['xu'] /= dx
+            tmp['yu'] /= dy
+            tmp['zu'] /= dz
+            np.savetxt(fh, tmp[['id', 'type', 'xu', 'yu', 'zu']], fmt='%6i %3i %.16f %.16f %.16f')
+
+
+
+def output_snapshots_multislice(data, headers, type2atomicn, directory):
+    """
+    """ 
+    mkdir_safe(directory)
     
     for dat, head in zip(data, headers):
         snapname = 'snapshot%07d' % head['TIMESTEP']
@@ -53,7 +97,8 @@ def sample_snapshots(trj, sampsnap_input):
                         sampsnap_input['every_nsteps'])
     
     print(indices)
-    indices += np.random.randint(low=-sampsnap_input['pm_nsteps'], high=sampsnap_input['pm_nsteps'], size=indices.shape[0])
+    if sampsnap_input['pm_nsteps'] != 0:
+        indices += np.random.randint(low=-sampsnap_input['pm_nsteps'], high=sampsnap_input['pm_nsteps'], size=indices.shape[0])
     if indices[0] < 0:
         indices[0] = 0
     if indices[-1] > nmax-1:
@@ -109,7 +154,8 @@ def process_input(inputfile):
                           'every_nsteps',
                           'pm_nsteps',
                           'skip_nsteps',
-                          'attype2atomicno'
+                          'attype2atomicno',
+                          'snapshot_style',
                           )
     
     # Get settings from file
@@ -152,6 +198,7 @@ def process_input(inputfile):
     
     if 'outputnpz' in sampsnap_input.keys():
         sampsnap_input['outputnpz'] = sampsnap_input['outputnpz'][-1]
+    
     
     return sampsnap_input
 

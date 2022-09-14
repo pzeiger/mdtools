@@ -148,7 +148,6 @@ class Trajectory():
         """
         nsteps = self.nsteps
         if self.skipnsteps:
-#            nsteps += self.skipnsteps
             tmpheader = self.process_timestep_header()
             try:
                 for i in range((self.skipnsteps)*(tmpheader['NUMBER OF ATOMS']+self.header_lines)-self.header_lines):
@@ -158,7 +157,7 @@ class Trajectory():
                 return None
         
         print('Timestep(s) loaded:')
-        step = 0
+        step = 1
         data = []
         header = []
         while True:
@@ -184,7 +183,7 @@ class Trajectory():
                     next(self.fh)
             except StopIteration:
                 print('Reached end of file')
-#                self.nstep = 
+                self.nstep = step
                 break
             
             step += 1
@@ -199,6 +198,8 @@ class Trajectory():
         """ If atomlist None, return data for all atoms
         """
         nsteps = self.data.shape[0]
+        print(self.data)
+        print(atomlist)
         if atomlist is not None:
             data = self.data[np.isin(self.data['id'], atomlist)].reshape((nsteps,-1))
         
