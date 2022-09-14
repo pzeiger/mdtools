@@ -198,8 +198,8 @@ class Trajectory():
         """ If atomlist None, return data for all atoms
         """
         nsteps = self.data.shape[0]
-        print(self.data)
-        print(atomlist)
+#        print(self.data)
+#        print(atomlist)
         if atomlist is not None:
             data = self.data[np.isin(self.data['id'], atomlist)].reshape((nsteps,-1))
         
