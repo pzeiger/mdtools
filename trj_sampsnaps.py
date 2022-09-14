@@ -25,7 +25,7 @@ def output_snapshots(data, headers, type2atomicn, style='drprobecel'):
     
     if style == 'drprobecel':
         output_snapshots_drprobecel(data, headers, type2atomicn, directory=directory)
-    elif style == 'drprobecel':
+    elif style == 'multislice':
         output_snapshots_multislice(data, headers, type2atomicn, directory=directory)
     else:
         raise NotImplementedError('Snapshot output style %s not implemented' % style)
@@ -199,6 +199,8 @@ def process_input(inputfile):
     if 'outputnpz' in sampsnap_input.keys():
         sampsnap_input['outputnpz'] = sampsnap_input['outputnpz'][-1]
     
+    if 'snapshot_style' in sampsnap_input.keys():
+        sampsnap_input['snapshot_style'] = sampsnap_input['snapshot_style'][-1]
     
     return sampsnap_input
 
@@ -247,7 +249,8 @@ def main(argv):
     
     print(sampled_headers)
     
-    output_snapshots(sampled_data, sampled_headers, sampsnap_input['attype2atomicno'])
+    output_snapshots(sampled_data, sampled_headers, sampsnap_input['attype2atomicno'],
+                     sampsnap_input['snapshot_style'])
     
     
     # Save pdos information to numpy archive
