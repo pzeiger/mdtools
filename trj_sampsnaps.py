@@ -52,8 +52,8 @@ def output_snapshots_drprobecel(data, headers, type2atomicn, directory):
             fh.write('%.16f %.16f %.16f\n' % (dx, dy, dz))
             fh.write('%i F\n' % (dat.shape[0]))
             tmp = np.copy(dat)
-            for el in type2atomicn:
-                tmp['type'][tmp['type'] == int(el[0])] = int(el[1])
+#            for el in type2atomicn:
+#                tmp['type'][tmp['type'] == int(el[0])] = int(el[1])
             tmp['xu'] /= dx
             tmp['yu'] /= dy
             tmp['zu'] /= dz
@@ -61,7 +61,19 @@ def output_snapshots_drprobecel(data, headers, type2atomicn, directory):
             if np.__version__ >= '1.18.0':
                 np.savetxt(fh, tmp[['id', 'type', 'xu', 'yu', 'zu']], fmt='%6i %3i %.16f %.16f %.16f')
             else:
-                np.savetxt(fh, rf.repack_fields(tmp[['id', 'type', 'xu', 'yu', 'zu']]), fmt='%6i %3i %.16f %.16f %.16f')
+                dtypetmp = tmp.dtype
+                dtype = np.dtype({'names':    ('id', 'type', 'xu', 'yu', 'zu'),
+                                  'formats':  (dtypetmp.fields['id'][0],
+                                               dtypetmp.fields['type'][0],
+                                               dtypetmp.fields['xu'][0],
+                                               dtypetmp.fields['yu'][0],
+                                               dtypetmp.fields['zu'][0])})
+                tmp2 = np.zeros(tmp.shape, dtype=dtype)
+                
+                for el in ('type', 'xu', 'yu', 'zu'):
+                    tmp2[el] = tmp[el]
+                
+                np.savetxt(fh, tmp2, fmt='%3i %.16f %.16f %.16f')
 
 
 
@@ -91,7 +103,18 @@ def output_snapshots_multislice(data, headers, type2atomicn, directory):
             if np.__version__ >= '1.18.0':
                 np.savetxt(fh, tmp[['type', 'xu', 'yu', 'zu']], fmt='%3i %.16f %.16f %.16f')
             else:
-                np.savetxt(fh, rf.repack_fields(tmp[['type', 'xu', 'yu', 'zu']]), fmt='%3i %.16f %.16f %.16f')
+                dtypetmp = tmp.dtype
+                dtype = np.dtype({'names':    ('type', 'xu', 'yu', 'zu'),
+                                  'formats':  (dtypetmp.fields['type'][0],
+                                               dtypetmp.fields['xu'][0],
+                                               dtypetmp.fields['yu'][0],
+                                               dtypetmp.fields['zu'][0])})
+                tmp2 = np.zeros(tmp.shape, dtype=dtype)
+                
+                for el in ('type', 'xu', 'yu', 'zu'):
+                    tmp2[el] = tmp[el]
+                
+                np.savetxt(fh, tmp2, fmt='%3i %.16f %.16f %.16f')
 
 
 
