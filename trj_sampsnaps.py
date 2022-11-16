@@ -79,7 +79,7 @@ def output_snapshots_multislice(data, headers, type2atomicn, directory):
             tmp['xu'] /= dx
             tmp['yu'] /= dy
             tmp['zu'] /= dz
-            np.savetxt(fh, tmp[['id', 'type', 'xu', 'yu', 'zu']], fmt='%6i %3i %.16f %.16f %.16f')
+            np.savetxt(fh, tmp[['type', 'xu', 'yu', 'zu']], fmt='%3i %.16f %.16f %.16f')
 
 
 
