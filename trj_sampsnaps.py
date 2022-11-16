@@ -7,6 +7,9 @@ import glob
 import sys
 import os
 from mdtools import io as mdio
+import numpy.lib.recfunctions as rf
+
+
 
 def mkdir_safe(directory):
     """
@@ -54,7 +57,12 @@ def output_snapshots_drprobecel(data, headers, type2atomicn, directory):
             tmp['xu'] /= dx
             tmp['yu'] /= dy
             tmp['zu'] /= dz
-            np.savetxt(fh, tmp[['id', 'type', 'xu', 'yu', 'zu']], fmt='%6i %3i %.16f %.16f %.16f')
+            
+            if np.__version__ >= '1.18.0':
+                np.savetxt(fh, tmp[['id', 'type', 'xu', 'yu', 'zu']], fmt='%6i %3i %.16f %.16f %.16f')
+            else:
+                np.savetxt(fh, rf.repack_fields(tmp[['id', 'type', 'xu', 'yu', 'zu']]), fmt='%6i %3i %.16f %.16f %.16f')
+
 
 
 
@@ -79,7 +87,12 @@ def output_snapshots_multislice(data, headers, type2atomicn, directory):
             tmp['xu'] /= dx
             tmp['yu'] /= dy
             tmp['zu'] /= dz
-            np.savetxt(fh, tmp[['type', 'xu', 'yu', 'zu']], fmt='%3i %.16f %.16f %.16f')
+
+            if np.__version__ >= '1.18.0':
+                np.savetxt(fh, tmp[['type', 'xu', 'yu', 'zu']], fmt='%3i %.16f %.16f %.16f')
+            else:
+                np.savetxt(fh, rf.repack_fields(tmp[['type', 'xu', 'yu', 'zu']]), fmt='%3i %.16f %.16f %.16f')
+
 
 
 
