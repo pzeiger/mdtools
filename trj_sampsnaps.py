@@ -28,8 +28,11 @@ def output_snapshots(data, headers, type2atomicn, style='drprobecel'):
     
     if style == 'drprobecel':
         output_snapshots_drprobecel(data, headers, type2atomicn, directory=directory)
-    elif style == 'multislice':
-        output_snapshots_multislice(data, headers, type2atomicn, directory=directory)
+    elif style[:10] == 'multislice':
+        version = style[10:].strip('_')
+        if version == '':
+            version = None
+        output_snapshots_multislice(data, headers, type2atomicn, directory=directory, version=version)
     else:
         raise NotImplementedError('Snapshot output style %s not implemented' % style)
         
@@ -74,49 +77,101 @@ def output_snapshots_drprobecel(data, headers, type2atomicn, directory):
                     tmp2[el] = tmp[el]
                 
                 np.savetxt(fh, tmp2, fmt='%3i %.16f %.16f %.16f')
+                write_snapshot_data(fh, tmp, fields_out, fmt=format_out)
 
 
 
-
-def output_snapshots_multislice(data, headers, type2atomicn, directory):
+def output_snapshots_multislice(data, headers, type2atomicn, directory, version=None):
     """
     """ 
     mkdir_safe(directory)
     
+    print(version)
+    if version is None:
+        fields_out = ('type', 'xs', 'ys', 'zs')
+        formats = ('u4', 'f8', 'f8', 'f8')
+        format_out = '%3i  % 15.12f  % 15.12f  % 15.12f'
+    elif version == 'pms':
+        fields_out = ('type', 'xs', 'ys', 'zs', 'mx', 'my', 'mz', 'mabs', 'Biso')
+        formats = ('u4', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8')
+        format_out = '%3i  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f'
+    else:
+        raise NotImplementedError('output for multislice version %s not implemented' % version)
+    
+    dtype = np.dtype({'names':    fields_out,
+                      'formats':  formats})
+    
     for dat, head in zip(data, headers):
+        
         snapname = 'snapshot%07d' % head['TIMESTEP']
         assert head['NUMBER OF ATOMS'] == dat.shape[0]
-#        print(dat.shape)
+        
         with open(directory+'/'+snapname, 'w') as fh:
-            dx = head['BOX BOUNDS'][0,1] - head['BOX BOUNDS'][0,0]
-            dy = head['BOX BOUNDS'][1,1] - head['BOX BOUNDS'][1,0]
-            dz = head['BOX BOUNDS'][2,1] - head['BOX BOUNDS'][2,0]
-            fh.write('%.16f %.16f %.16f\n' % (dx, dy, dz))
+
+            box_dim = {
+                'x':   head['BOX BOUNDS'][0,1] - head['BOX BOUNDS'][0,0],
+                'y':   head['BOX BOUNDS'][1,1] - head['BOX BOUNDS'][1,0],
+                'z':   head['BOX BOUNDS'][2,1] - head['BOX BOUNDS'][2,0],
+            }
+            fh.write('%.16f %.16f %.16f\n' % (box_dim['x'], box_dim['y'], box_dim['z']))
             fh.write('%i F\n' % (dat.shape[0]))
-            tmp = np.copy(dat)
+            
+            tmp = np.zeros(dat.shape, dtype=dtype)
+            copy_columns_structured_array(dat, tmp)
+            
+            fields_dat = dat.dtype.fields.keys()
+            
+            fields_missing = set(fields_out) - set(fields_dat)
+            
+            for field in fields_missing:
+                if field in ('xs', 'ys', 'zs'):
+                    tmp[field] = dat[field.strip('s') + 'u'] / box_dim[field.strip('s')]
+                    tmp[field][tmp[field] < .0 ] += 1.0
+            
+            print(tmp)
             for el in type2atomicn:
                 tmp['type'][tmp['type'] == int(el[0])] = int(el[1])
-            tmp['xu'] /= dx
-            tmp['yu'] /= dy
-            tmp['zu'] /= dz
 
-            if np.__version__ >= '1.18.0':
-                np.savetxt(fh, tmp[['type', 'xu', 'yu', 'zu']], fmt='%3i %.16f %.16f %.16f')
-            else:
-                dtypetmp = tmp.dtype
-                dtype = np.dtype({'names':    ('type', 'xu', 'yu', 'zu'),
-                                  'formats':  (dtypetmp.fields['type'][0],
-                                               dtypetmp.fields['xu'][0],
-                                               dtypetmp.fields['yu'][0],
-                                               dtypetmp.fields['zu'][0])})
-                tmp2 = np.zeros(tmp.shape, dtype=dtype)
-                
-                for el in ('type', 'xu', 'yu', 'zu'):
-                    tmp2[el] = tmp[el]
-                
-                np.savetxt(fh, tmp2, fmt='%3i %.16f %.16f %.16f')
+            write_snapshot_data(fh, tmp, fields_out, fmt=format_out)
+            
 
 
+
+def write_snapshot_data(fh, data, fields_out, fmt):
+    """
+    """
+    if np.__version__ >= '1.18.0':
+        print(data[list(fields_out)])
+        np.savetxt(fh, data[list(fields_out)], fmt=fmt)
+    else:
+        dtypedata = data.dtype
+        dtype = np.dtype({'names':    fields_out,
+                          'formats':  [dtypedata.fields[field][0] for field in fields_out],
+                        })
+        
+        tmp = np.zeros(data.shape, dtype=dtype)
+        
+        for el in fields_out:
+            tmp[el] = data[el]
+        
+        print(tmp)
+        
+        np.savetxt(fh, tmp, fmt=fmt)
+    
+    return None
+
+
+def copy_columns_structured_array(sarray_src, sarray_tgt):
+    """
+        Copy column contents from structured (source) array sarray_src to
+        structured (target) array sarray_tgt
+    """
+    fields_src = sarray_src.dtype.fields.keys()
+    fields_tgt = sarray_tgt.dtype.fields.keys()
+    
+    for field in fields_src:
+        if field in fields_tgt:
+            sarray_tgt[field] = sarray_src[field]
 
 
 def sample_snapshots(trj, sampsnap_input):
@@ -141,43 +196,45 @@ def sample_snapshots(trj, sampsnap_input):
         indices[-1] = nmax-1
     print(indices)
     
+#    sampled_data = np.zeros(data[indices].shape, dtype=sampsnap_input['sample_dtype'])
+#    copy_columns_structured_array(data[indices], sampled_data)
+
     sampled_data = data[indices]
     sampled_headers = header[indices]
     print(sampled_data.shape)
     print(sampled_headers.shape)
     
+    dtype_dat = sampled_data.dtype
+    fields = dtype_dat.fields.keys()
+    names = list(dtype_dat.fields.keys()) + sampsnap_input['extra_field_names']
+    formats = [dtype_dat.fields[field][0] for field in fields] + sampsnap_input['extra_field_formats']
+    
+    dtype = np.dtype({'names':    names,
+                      'formats':  formats,
+                    })
+    
+    
+    tmp = np.zeros(sampled_data.shape, dtype=dtype)
+    copy_columns_structured_array(sampled_data, tmp)
+    
+    sampled_data = tmp
+    print(sampled_data)
+    
+    if 'uniform_spin_direction' in sampsnap_input.keys():
+        sampled_data['mx'] = sampsnap_input['uniform_spin_direction'][0]
+        sampled_data['my'] = sampsnap_input['uniform_spin_direction'][1]
+        sampled_data['mz'] = sampsnap_input['uniform_spin_direction'][2]
+
+    if 'Biso' in sampsnap_input.keys():
+        for ii, Biso in enumerate(sampsnap_input['Biso']):
+            sampled_data['Biso'][sampled_data['type'] == (ii+1)] = Biso
+
+    if 'magnetic_moments' in sampsnap_input.keys():
+        for ii, mm in enumerate(sampsnap_input['magnetic_moments']):
+            sampled_data['mabs'][sampled_data['type'] == (ii+1)] = mm
+
     return sampled_data, sampled_headers
 
-
-
-#def read_input(argv):
-#    
-#    print(argv)
-#    
-#    if len(argv) == 1:
-#        fh = open('trj_sampsnaps.in', 'r')
-#    elif len(argv) == 2:
-#        inputfile = argv[1]
-#        fh = open(inputfile, 'r')
-#    else:
-#        sys.exit()
-#    
-#    tmp = []
-#    for line in fh:
-#        tmp.append(line.strip().split(' ')[0])
-#    print(tmp)
-#    
-#    assert len(tmp) == 5
-#    
-#    sampsnap_input = {
-#        'trjfile':        str(tmp[0]),
-#        'snapfile':       str(tmp[1]),
-#        'skip_nsteps':    int(tmp[2]),
-#        'every_nsteps':   int(tmp[3]),
-#        'pm_nsteps':      int(tmp[4]),
-#    }
-#    
-#    return sampsnap_input
 
 
 
@@ -192,10 +249,14 @@ def process_input(inputfile):
                           'skip_nsteps',
                           'attype2atomicno',
                           'snapshot_style',
+                          'Biso',
+                          'uniform_spin_direction',
+                          'magnetic_moments',
                           )
     
     # Get settings from file
     sampsnap_input = mdio.inputfile2dict(inputfile, recognized_strings)
+    
     
     # Clean up settings
     tmp = []
@@ -237,6 +298,29 @@ def process_input(inputfile):
     
     if 'snapshot_style' in sampsnap_input.keys():
         sampsnap_input['snapshot_style'] = sampsnap_input['snapshot_style'][-1]
+    
+    
+    extra_field_names = []
+    extra_field_formats = []
+
+    if 'Biso' in sampsnap_input.keys():
+        extra_field_names.append('Biso')
+        extra_field_formats.append('f8')
+    
+    if 'magnetic_moments' in sampsnap_input.keys():
+        sampsnap_input['magnetic_moments'] = np.array([ np.double(x) for x in sampsnap_input['magnetic_moments']])
+        extra_field_names.append('mabs')
+        extra_field_formats.append('f8')
+    
+    if 'uniform_spin_direction' in sampsnap_input.keys():
+        sampsnap_input['uniform_spin_direction'] = np.array([np.double(x) for x in sampsnap_input['uniform_spin_direction'][0]])
+        assert sampsnap_input['uniform_spin_direction'].shape == (3,)
+        for el in ('mx', 'my', 'mz'):
+            extra_field_names.append(el)
+            extra_field_formats.append('f8')
+    
+    sampsnap_input['extra_field_names'] = extra_field_names
+    sampsnap_input['extra_field_formats'] = extra_field_formats
     
     return sampsnap_input
 
