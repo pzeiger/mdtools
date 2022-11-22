@@ -114,7 +114,7 @@ def output_snapshots_multislice(data, headers, type2atomicn, directory, version=
                 'z':   head['BOX BOUNDS'][2,1] - head['BOX BOUNDS'][2,0],
             }
             fh.write('%.16f %.16f %.16f\n' % (box_dim['x'], box_dim['y'], box_dim['z']))
-            fh.write('%i F\n' % (dat.shape[0]))
+            fh.write('%i\n' % (dat.shape[0]))
             
             tmp = np.zeros(dat.shape, dtype=dtype)
             copy_columns_structured_array(dat, tmp)
