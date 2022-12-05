@@ -8,7 +8,9 @@ import sys
 import os
 from mdtools import io as mdio
 import numpy.lib.recfunctions as rf
-
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from pathlib import Path
 
 
 def mkdir_safe(directory):
@@ -21,85 +23,87 @@ def mkdir_safe(directory):
 
 
 
-def output_snapshots(data, headers, type2atomicn, style='drprobecel'):
+
+
+def output_snapshots(data, headers, attype_conversion, style='drprobecel', subdirectory=None):
     """
     """
-    directory = 'snaps' + '_' + style
+    if subdirectory is not None:
+        directory = 'snaps' + '_' + style + '/' + subdirectory
+    else:
+        directory = 'snaps' + '_' + style
     
-    if style == 'drprobecel':
-        output_snapshots_drprobecel(data, headers, type2atomicn, directory=directory)
+    if style[:10] == 'drprobecel':
+        output_snapshots_drprobecel(data, headers, attype_conversion, directory=directory)
     elif style[:10] == 'multislice':
         version = style[10:].strip('_')
         if version == '':
             version = None
-        output_snapshots_multislice(data, headers, type2atomicn, directory=directory, version=version)
+        output_snapshots_multislice(data, headers, attype_conversion, directory=directory, version=version)
     else:
         raise NotImplementedError('Snapshot output style %s not implemented' % style)
         
 
 
 
-def output_snapshots_drprobecel(data, headers, type2atomicn, directory):
+def output_snapshots_drprobecel(data, headers, attype_conversion, directory):
     """
     """
-    mkdir_safe(directory)
+    Path(directory).mkdir(parents=True, exist_ok=True)
+#    mkdir_safe(directory)
+    
+    fields = ('type', 'xs', 'ys', 'zs', 'occ', 'Biso', 'placeholder1', 'placeholder2', 'placeholder3')
+    formats = ('U6', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8')
+    format_write = '%6s  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f'
     
     for dat, head in zip(data, headers):
+        print(headers)
+        print(len(headers))
+        print(head)
+        print(len(head))
+        print(dat)
+        print(len(dat))
         snapname = 'snapshot%07d.cel' % head['TIMESTEP']
         assert head['NUMBER OF ATOMS'] == dat.shape[0]
 #        print(dat.shape)
         with open(directory+'/'+snapname, 'w') as fh:
-            dx = head['BOX BOUNDS'][0,1] - head['BOX BOUNDS'][0,0]
-            dy = head['BOX BOUNDS'][1,1] - head['BOX BOUNDS'][1,0]
-            dz = head['BOX BOUNDS'][2,1] - head['BOX BOUNDS'][2,0]
-            fh.write('%.16f %.16f %.16f\n' % (dx, dy, dz))
-            fh.write('%i F\n' % (dat.shape[0]))
-            tmp = np.copy(dat)
-#            for el in type2atomicn:
-#                tmp['type'][tmp['type'] == int(el[0])] = int(el[1])
-            tmp['xu'] /= dx
-            tmp['yu'] /= dy
-            tmp['zu'] /= dz
             
-            if np.__version__ >= '1.18.0':
-                np.savetxt(fh, tmp[['id', 'type', 'xu', 'yu', 'zu']], fmt='%6i %3i %.16f %.16f %.16f')
-            else:
-                dtypetmp = tmp.dtype
-                dtype = np.dtype({'names':    ('id', 'type', 'xu', 'yu', 'zu'),
-                                  'formats':  (dtypetmp.fields['id'][0],
-                                               dtypetmp.fields['type'][0],
-                                               dtypetmp.fields['xu'][0],
-                                               dtypetmp.fields['yu'][0],
-                                               dtypetmp.fields['zu'][0])})
-                tmp2 = np.zeros(tmp.shape, dtype=dtype)
-                
-                for el in ('type', 'xu', 'yu', 'zu'):
-                    tmp2[el] = tmp[el]
-                
-                np.savetxt(fh, tmp2, fmt='%3i %.16f %.16f %.16f')
-                write_snapshot_data(fh, tmp, fields_out, fmt=format_out)
+            tmp, box_dim = prepare_data(dat, head, fields, formats)
+            
+            # get box dimensions in nm
+            box_dim['x'] /= 10
+            box_dim['y'] /= 10
+            box_dim['z'] /= 10
+            
+            fh.write('# Cel file created by trj_sampsnaps.py\n')
+            fh.write('0  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f\n' \
+                     % (box_dim['x'], box_dim['y'], box_dim['z'], 90., 90., 90.))
+            
+            for el in attype_conversion:
+                tmp['type'][tmp['type'] == el[0]] = str(el[1])
+            
+            tmp['occ'] = 1.
+            write_snapshot_data(fh, tmp, fields, fmt=format_write)
+            fh.write('*\n')
 
 
 
-def output_snapshots_multislice(data, headers, type2atomicn, directory, version=None):
+def output_snapshots_multislice(data, headers, attype_conversion, directory, version=None):
     """
     """ 
     mkdir_safe(directory)
     
     print(version)
     if version is None:
-        fields_out = ('type', 'xs', 'ys', 'zs')
+        fields = ('type', 'xs', 'ys', 'zs')
         formats = ('u4', 'f8', 'f8', 'f8')
-        format_out = '%3i  % 15.12f  % 15.12f  % 15.12f'
+        format_write = '%3i  % 15.12f  % 15.12f  % 15.12f'
     elif version == 'pms':
-        fields_out = ('type', 'xs', 'ys', 'zs', 'mx', 'my', 'mz', 'mabs', 'Biso')
+        fields = ('type', 'xs', 'ys', 'zs', 'mx', 'my', 'mz', 'mabs', 'Biso')
         formats = ('u4', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8', 'f8')
-        format_out = '%3i  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f'
+        format_write = '%3i  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f'
     else:
         raise NotImplementedError('output for multislice version %s not implemented' % version)
-    
-    dtype = np.dtype({'names':    fields_out,
-                      'formats':  formats})
     
     for dat, head in zip(data, headers):
         
@@ -107,33 +111,47 @@ def output_snapshots_multislice(data, headers, type2atomicn, directory, version=
         assert head['NUMBER OF ATOMS'] == dat.shape[0]
         
         with open(directory+'/'+snapname, 'w') as fh:
+            
+            tmp, box_dim = prepare_data(dat, head, fields, formats)
 
-            box_dim = {
-                'x':   head['BOX BOUNDS'][0,1] - head['BOX BOUNDS'][0,0],
-                'y':   head['BOX BOUNDS'][1,1] - head['BOX BOUNDS'][1,0],
-                'z':   head['BOX BOUNDS'][2,1] - head['BOX BOUNDS'][2,0],
-            }
+            for el in attype_conversion:
+                tmp['type'][tmp['type'] == int(el[0])] = int(el[1])
+            
             fh.write('%.16f %.16f %.16f\n' % (box_dim['x'], box_dim['y'], box_dim['z']))
             fh.write('%i F\n' % (dat.shape[0]))
             
-            tmp = np.zeros(dat.shape, dtype=dtype)
-            copy_columns_structured_array(dat, tmp)
+            write_snapshot_data(fh, tmp, fields, fmt=format_write)
             
-            fields_dat = dat.dtype.fields.keys()
-            
-            fields_missing = set(fields_out) - set(fields_dat)
-            
-            for field in fields_missing:
-                if field in ('xs', 'ys', 'zs'):
-                    tmp[field] = dat[field.strip('s') + 'u'] / box_dim[field.strip('s')]
-                    tmp[field][tmp[field] < .0 ] += 1.0
-            
-            print(tmp)
-            for el in type2atomicn:
-                tmp['type'][tmp['type'] == int(el[0])] = int(el[1])
 
-            write_snapshot_data(fh, tmp, fields_out, fmt=format_out)
-            
+
+
+
+def prepare_data(dat, head, fields_out, formats_out):
+    """
+    """
+    dtype_out = np.dtype({'names':    fields_out,
+                          'formats':  formats_out})
+
+    box_dim = {
+        'x':   head['BOX BOUNDS'][0,1] - head['BOX BOUNDS'][0,0],
+        'y':   head['BOX BOUNDS'][1,1] - head['BOX BOUNDS'][1,0],
+        'z':   head['BOX BOUNDS'][2,1] - head['BOX BOUNDS'][2,0],
+    }
+    
+    out = np.zeros(dat.shape, dtype=dtype_out)
+    copy_columns_structured_array(dat, out)
+    
+    fields_dat = dat.dtype.fields.keys()
+    fields_missing = set(fields_out) - set(fields_dat)
+    
+    for field in fields_missing:
+        if field in ('xs', 'ys', 'zs'):
+            out[field] = dat[field.strip('s') + 'u'] / box_dim[field.strip('s')]
+            out[field][out[field] < .0 ] += 1.0
+        elif field in ('xu', 'yu', 'zu'):
+            out[field] = dat[field.strip('u') + 's'] * box_dim[field.strip('u')]
+    
+    return out, box_dim
 
 
 
@@ -174,9 +192,27 @@ def copy_columns_structured_array(sarray_src, sarray_tgt):
             sarray_tgt[field] = sarray_src[field]
 
 
+
+
 def sample_snapshots(trj, sampsnap_input):
     """
     """
+    
+    if 'fftfreqsel' in sampsnap_input.keys():
+        sampled_data, sampled_headers = sample_snapshots_fftfreqsel(trj, sampsnap_input)
+    else:
+        sampled_data, sampled_headers = sample_snapshots_trj(trj, sampsnap_input)
+    return sampled_data, sampled_headers
+
+
+
+
+
+
+def sample_snapshots_trj(trj, sampsnap_input):
+    """
+    """
+    
     data = trj.data
     header = trj.header
     
@@ -213,17 +249,16 @@ def sample_snapshots(trj, sampsnap_input):
                       'formats':  formats,
                     })
     
-    
     tmp = np.zeros(sampled_data.shape, dtype=dtype)
     copy_columns_structured_array(sampled_data, tmp)
     
     sampled_data = tmp
     print(sampled_data)
     
-    if 'uniform_spin_direction' in sampsnap_input.keys():
-        sampled_data['mx'] = sampsnap_input['uniform_spin_direction'][0]
-        sampled_data['my'] = sampsnap_input['uniform_spin_direction'][1]
-        sampled_data['mz'] = sampsnap_input['uniform_spin_direction'][2]
+    if 'uniform_magmom_dir' in sampsnap_input.keys():
+        sampled_data['mx'] = sampsnap_input['uniform_magmom_dir'][0]
+        sampled_data['my'] = sampsnap_input['uniform_magmom_dir'][1]
+        sampled_data['mz'] = sampsnap_input['uniform_magmom_dir'][2]
 
     if 'Biso' in sampsnap_input.keys():
         for ii, Biso in enumerate(sampsnap_input['Biso']):
@@ -237,6 +272,202 @@ def sample_snapshots(trj, sampsnap_input):
 
 
 
+def sample_snapshots_fftfreqsel(trj, sampsnap_input):
+    """
+    """
+#    nevery = sampsnap_input['fftfreqsel']['nevery']
+    df = sampsnap_input['fftfreqsel']['df']                 # width of frequency interval
+    fmin = sampsnap_input['fftfreqsel']['fmin']
+    fmax = sampsnap_input['fftfreqsel']['fmax']
+    nsplit = sampsnap_input['fftfreqsel']['nsplit']
+    chunksize = 1000
+    
+    data = trj.data
+    headers = trj.header
+    
+    print(data.shape)
+    
+    # Total number of samples in the trajectory
+    nsamples_t = data.shape[0]
+    nsamplesize_t = int((nsamples_t - nsamples_t % nsplit)/ nsplit)
+    
+    print(nsamplesize_t)
+    
+    # get the FFT frequencies
+    fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=trj.dt)
+    print(fft_freq)
+    
+    # Get the equilibrium positions of the data
+    equpos = np.zeros(data.shape[1], dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
+                                                     'formats': ['f8', 'f8', 'f8']}))
+    equpos['xu'] = np.mean(data['xu'], axis=0)
+    equpos['yu'] = np.mean(data['yu'], axis=0)
+    equpos['zu'] = np.mean(data['zu'], axis=0)
+    
+    pos0 = np.zeros(data.shape[1], dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
+                                                   'formats': ['f8', 'f8', 'f8']}))
+    pos0['xu'] = trj.data0['xu']
+    pos0['yu'] = trj.data0['yu']
+    pos0['zu'] = trj.data0['zu']
+    
+    box_dim = {
+        'x':   trj.header0['BOX BOUNDS'][0,1] - trj.header0['BOX BOUNDS'][0,0],
+        'y':   trj.header0['BOX BOUNDS'][1,1] - trj.header0['BOX BOUNDS'][1,0],
+        'z':   trj.header0['BOX BOUNDS'][2,1] - trj.header0['BOX BOUNDS'][2,0],
+    }
+    
+
+    np.savetxt('tmp_pos0-eqpos', pos0['xu']-equpos['xu'])
+    np.savetxt('tmp_pos0-eqpos', pos0['yu']-equpos['yu'])
+    np.savetxt('tmp_pos0-eqpos', pos0['zu']-equpos['zu'])
+    
+    equpos['xu'][pos0['xu']-equpos['xu'] >=  box_dim['x']/2] += box_dim['x']
+    equpos['xu'][pos0['xu']-equpos['xu'] <= -box_dim['x']/2] -= box_dim['x']
+    equpos['yu'][pos0['yu']-equpos['yu'] >=  box_dim['y']/2] += box_dim['y']
+    equpos['yu'][pos0['yu']-equpos['yu'] <= -box_dim['y']/2] -= box_dim['y']
+    equpos['zu'][pos0['zu']-equpos['zu'] >=  box_dim['z']/2] += box_dim['z']
+    equpos['zu'][pos0['zu']-equpos['zu'] <= -box_dim['z']/2] -= box_dim['z']
+    
+    
+    print(np.where(pos0['xu']-equpos['xu'] >=  box_dim['x']/2))
+    print(np.where(pos0['yu']-equpos['yu'] >=  box_dim['y']/2))
+    print(np.where(pos0['zu']-equpos['zu'] >=  box_dim['z']/2))
+    print(np.where(pos0['xu']-equpos['xu'] <= -box_dim['x']/2))
+    print(np.where(pos0['yu']-equpos['yu'] <= -box_dim['y']/2))
+    print(np.where(pos0['zu']-equpos['zu'] <= -box_dim['z']/2))
+    
+    np.savetxt('tmp_pos0-eqpos2', pos0['xu']-equpos['xu'])
+    np.savetxt('tmp_pos0-eqpos2', pos0['yu']-equpos['yu'])
+    np.savetxt('tmp_pos0-eqpos2', pos0['zu']-equpos['zu'])
+    
+    print(equpos)
+    print(pos0)
+    print('maximum deviation from perfect crystal position in x: %f', np.abs(pos0['xu']-equpos['xu']).max())
+    print('maximum deviation from perfect crystal position in y: %f', np.abs(pos0['yu']-equpos['yu']).max())
+    print('maximum deviation from perfect crystal position in z: %f', np.abs(pos0['zu']-equpos['zu']).max())
+    
+#    attype2el = ('B', 'N', 'B')
+#    attype2dwf = (.0, .0, .0)
+    
+    # This is a list of frequencies, which we want to sample
+    freqs = np.linspace(fmin, fmax, int((fmax-fmin)/df+1))
+    
+    if data.shape[1] < chunksize:
+        atchunks = np.arange(0, data.shape[1], chunksize)
+    else:
+        atchunks = np.arange(0, data.shape[1], chunksize)
+    
+    atchunks = [(x, x+chunksize) for x in atchunks]
+    
+    print('atchunks', atchunks)
+    
+    sampled_data = []
+    sampled_headers = [] 
+    
+    for f0 in freqs:
+        
+        sampled_data.append((f0, []))
+        sampled_headers.append((f0, []))
+        
+        print('%04.1fTHz' % (f0/1e12))
+        
+        # Loop over the splits of the trajectory
+        for ns in range(nsplit):
+            
+            nmax = nsamplesize_t
+            
+            split_data = data[ns*nsamplesize_t:(ns+1)*nsamplesize_t, :]
+            split_headers = headers[ns*nsamplesize_t:(ns+1)*nsamplesize_t]
+            
+#            print('split_data.shape', split_data.shape)
+#            print('split_data', split_data)
+#            print('data', data[ns*nsamplesize_t])
+#            print('data', data[(ns+1)*nsamplesize_t-1])
+#            print(nmax)
+            
+            indices = np.arange(sampsnap_input['skip_nsteps'],
+                                nmax+sampsnap_input['pm_nsteps'],
+                                sampsnap_input['every_nsteps'])
+            
+            print('indices1', indices)
+            if sampsnap_input['pm_nsteps'] != 0:
+                indices += np.random.randint(low=-sampsnap_input['pm_nsteps'], 
+                                             high=sampsnap_input['pm_nsteps'],
+                                             size=indices.shape[0])
+            print('indices1', indices)
+#            print(np.logical_and(indices >= 0, indices <= (nmax-1)))
+            indices = indices[np.logical_and(indices >= 0, indices <= (nmax-1))]
+            
+#            if indices[0] < 0:
+#                indices[0] = 0
+#            if indices[-1] > nmax-1:
+#                indices[-1] = nmax-1
+            print('indices', indices)
+            
+#            metadata = header[sample_times]
+            sampled_snaps = np.zeros((indices.size, data.shape[1]), dtype=data.dtype)
+            
+            # Candidate for parallelisation
+            for ach in atchunks:
+                
+                split_chunked_data = split_data[:,ach[0]:ach[1]]
+                print(split_chunked_data.shape)
+                
+                tmp = np.moveaxis(np.array([split_chunked_data['xu'],
+                                            split_chunked_data['yu'],
+                                            split_chunked_data['zu']]), 0, 2)
+                
+                dat_fft = np.fft.rfft(tmp, axis=0)
+                
+                dat_fft_ifft = np.fft.irfft(dat_fft, axis=0)
+                
+                selector = np.logical_and(fft_freq <  (f0+df/2),
+                                          fft_freq >= (f0-df/2))
+                
+                
+                dat_fft_select = dat_fft * selector[:, np.newaxis, np.newaxis]
+                dat_fft_select_ifft = np.fft.irfft(dat_fft_select, axis=0) 
+                
+                sampled_snaps[:,ach[0]:ach[1]]['id'] = split_chunked_data['id'][indices,:]
+                sampled_snaps[:,ach[0]:ach[1]]['type'] = split_chunked_data['type'][indices,:]
+                sampled_snaps[:,ach[0]:ach[1]]['xu'] = dat_fft_select_ifft[indices,:,0] + pos0['xu'][ach[0]:ach[1]]
+                sampled_snaps[:,ach[0]:ach[1]]['yu'] = dat_fft_select_ifft[indices,:,1] + pos0['yu'][ach[0]:ach[1]]
+                sampled_snaps[:,ach[0]:ach[1]]['zu'] = dat_fft_select_ifft[indices,:,2] + pos0['zu'][ach[0]:ach[1]]
+                
+#                fig, ax = plt.subplots()
+#                ax.plot(fft_freq/1e12, np.sum(np.abs(dat_fft)**2, axis=(1,2))*fft_freq**2, label='rawfft')
+#                ax.plot(fft_freq/1e12, np.sum(np.abs(dat_fft_select)**2, axis=(1,2))*fft_freq**2, label='selected fft')
+#                plt.show()
+            
+            for sampsnap in sampled_snaps:
+                sampled_data[-1][1].append(sampsnap)
+            
+            for samphead in split_headers[indices]:
+                sampled_headers[-1][1].append(samphead)
+            
+            
+#            fig = plt.figure()
+#            ax = fig.add_subplot(projection='3d')
+#            ax.azim = .0
+#            ax.elev = 90.
+#            
+#            ax.set_proj_type('ortho')
+#            
+#            zmin = 0.0
+#            zmax = 6.6
+#            selector1 = np.logical_and(sampled_snaps['zu'] >= zmin, sampled_snaps['zu'] <= zmax)
+#            selector2 = np.logical_and(pos0['zu'] >= zmin, pos0['zu'] <= zmax)
+#            
+#            ax.scatter(pos0['xu'][selector2], pos0['yu'][selector2], pos0['zu'][selector2])
+#            ax.scatter(sampled_snaps['xu'][selector1], sampled_snaps['yu'][selector1], sampled_snaps['zu'][selector1])
+#            ax.scatter(pos0['xu'], pos0['yu'], pos0['zu'])
+#            ax.scatter(sampled_snaps['xu'], sampled_snaps['yu'], sampled_snaps['zu'])
+#            plt.show()
+    
+    
+    return sampled_data, sampled_headers
+
+
 
 def process_input(inputfile):
     """
@@ -247,11 +478,12 @@ def process_input(inputfile):
                           'every_nsteps',
                           'pm_nsteps',
                           'skip_nsteps',
-                          'attype2atomicno',
+                          'attype_conversion',
                           'snapshot_style',
                           'Biso',
-                          'uniform_spin_direction',
+                          'uniform_magmom_dir',
                           'magnetic_moments',
+                          'fftfreqsel',
                           )
     
     # Get settings from file
@@ -260,12 +492,15 @@ def process_input(inputfile):
     
     # Clean up settings
     tmp = []
-    if 'attype2atomicno' in sampsnap_input.keys():
-        for atomlist in sampsnap_input['attype2atomicno']:
-            
-            tmp.append(np.array(atomlist, dtype=np.int_))
-        
-        sampsnap_input['attype2atomicno'] = tmp
+    if 'attype_conversion' in sampsnap_input.keys():
+        for atomlist in sampsnap_input['attype_conversion']:
+            tmp.append(atomlist)
+        sampsnap_input['attype_conversion'] = tmp
+    
+#    if 'attype2el' in sampsnap_input.keys():
+#        for atomlist in sampsnap_input['attype2el']:
+#            tmp['%s' % atomlist[0]] = atomlist[1]
+#        sampsnap_input['attype2el'] = tmp
     
     tmp = []
     if 'attypes' in sampsnap_input.keys():
@@ -312,9 +547,9 @@ def process_input(inputfile):
         extra_field_names.append('mabs')
         extra_field_formats.append('f8')
     
-    if 'uniform_spin_direction' in sampsnap_input.keys():
-        sampsnap_input['uniform_spin_direction'] = np.array([np.double(x) for x in sampsnap_input['uniform_spin_direction'][0]])
-        assert sampsnap_input['uniform_spin_direction'].shape == (3,)
+    if 'uniform_magmom_dir' in sampsnap_input.keys():
+        sampsnap_input['uniform_magmom_dir'] = np.array([np.double(x) for x in sampsnap_input['uniform_magmom_dir'][0]])
+        assert sampsnap_input['uniform_magmom_dir'].shape == (3,)
         for el in ('mx', 'my', 'mz'):
             extra_field_names.append(el)
             extra_field_formats.append('f8')
@@ -322,6 +557,16 @@ def process_input(inputfile):
     sampsnap_input['extra_field_names'] = extra_field_names
     sampsnap_input['extra_field_formats'] = extra_field_formats
     
+    tmp = {}
+    if 'fftfreqsel' in sampsnap_input.keys():
+        for el in sampsnap_input['fftfreqsel']:
+            if el[0][0].lower() == 'n':
+                tmp[el[0]] = int(el[1])
+            else:
+                tmp[el[0]] = np.double(el[1])
+        sampsnap_input['fftfreqsel'] = tmp
+    
+
     return sampsnap_input
 
 
@@ -367,10 +612,17 @@ def main(argv):
     
     sampled_data, sampled_headers = sample_snapshots(trj, sampsnap_input)
     
+    print(sampled_data)
     print(sampled_headers)
     
-    output_snapshots(sampled_data, sampled_headers, sampsnap_input['attype2atomicno'],
-                     sampsnap_input['snapshot_style'])
+    if 'fftfreqsel' in sampsnap_input:
+        for tmpdata, tmpheaders in zip(sampled_data, sampled_headers):
+            subdir = '%04.1fThz' % (tmpdata[0]/1e12 )
+            output_snapshots(tmpdata[1], tmpheaders[1], sampsnap_input['attype_conversion'],
+                             sampsnap_input['snapshot_style'], subdirectory=subdir)
+    else:
+        output_snapshots(sampled_data, sampled_headers, sampsnap_input['attype_conversion'],
+                         sampsnap_input['snapshot_style'])
     
     
     # Save pdos information to numpy archive

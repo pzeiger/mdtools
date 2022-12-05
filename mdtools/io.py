@@ -15,9 +15,11 @@ def inputfile2dict(inputfile, recognized_strings):
                 continue
             elif tmp[0] in recognized_strings:
                 identifier = tmp[0]
-            else:
                 if identifier not in out.keys():
-                    out[identifier] = []
+                   out[identifier] = []
+            else:
+#                if identifier not in out.keys():
+#                    out[identifier] = []
 #                print(len(tmp))
                 if len(tmp) == 1:
                     out[identifier].append(tmp[0])
