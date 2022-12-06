@@ -352,7 +352,7 @@ class LammpsTrj(Trajectory):
                         
                         data = np.array(np.empty(header['NUMBER OF ATOMS']), dtype=dtype)
                         print(data.shape)
-                    if atomstyle.lower() == 'charge':
+                    elif atomstyle.lower() == 'charge':
                         header['ATOMS'] = ['id', 'type', 'charge', 'xu', 'yu', 'zu']
                         dtype={'names': header['ATOMS'],
                                'formats': ('u4', 'u1', 'f8', 'f8', 'f8', 'f8', 'i', 'i', 'i')}
