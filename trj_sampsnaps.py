@@ -316,11 +316,9 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
         'z':   trj.header0['BOX BOUNDS'][2,1] - trj.header0['BOX BOUNDS'][2,0],
     }
     
-
-    np.savetxt('tmp_pos0-eqpos', pos0['xu']-equpos['xu'])
-    np.savetxt('tmp_pos0-eqpos', pos0['yu']-equpos['yu'])
-    np.savetxt('tmp_pos0-eqpos', pos0['zu']-equpos['zu'])
-    
+    # Correct for atom moving to other side of the box 
+    # This should not happen with unwrapped coordinates from LAMMPS, but just
+    # to be sure.
     equpos['xu'][pos0['xu']-equpos['xu'] >=  box_dim['x']/2] += box_dim['x']
     equpos['xu'][pos0['xu']-equpos['xu'] <= -box_dim['x']/2] -= box_dim['x']
     equpos['yu'][pos0['yu']-equpos['yu'] >=  box_dim['y']/2] += box_dim['y']
@@ -328,26 +326,9 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     equpos['zu'][pos0['zu']-equpos['zu'] >=  box_dim['z']/2] += box_dim['z']
     equpos['zu'][pos0['zu']-equpos['zu'] <= -box_dim['z']/2] -= box_dim['z']
     
-    
-    print(np.where(pos0['xu']-equpos['xu'] >=  box_dim['x']/2))
-    print(np.where(pos0['yu']-equpos['yu'] >=  box_dim['y']/2))
-    print(np.where(pos0['zu']-equpos['zu'] >=  box_dim['z']/2))
-    print(np.where(pos0['xu']-equpos['xu'] <= -box_dim['x']/2))
-    print(np.where(pos0['yu']-equpos['yu'] <= -box_dim['y']/2))
-    print(np.where(pos0['zu']-equpos['zu'] <= -box_dim['z']/2))
-    
-    np.savetxt('tmp_pos0-eqpos2', pos0['xu']-equpos['xu'])
-    np.savetxt('tmp_pos0-eqpos2', pos0['yu']-equpos['yu'])
-    np.savetxt('tmp_pos0-eqpos2', pos0['zu']-equpos['zu'])
-    
-    print(equpos)
-    print(pos0)
     print('maximum deviation from perfect crystal position in x: %f', np.abs(pos0['xu']-equpos['xu']).max())
     print('maximum deviation from perfect crystal position in y: %f', np.abs(pos0['yu']-equpos['yu']).max())
     print('maximum deviation from perfect crystal position in z: %f', np.abs(pos0['zu']-equpos['zu']).max())
-    
-#    attype2el = ('B', 'N', 'B')
-#    attype2dwf = (.0, .0, .0)
     
     # This is a list of frequencies, which we want to sample
     freqs = np.linspace(fmin, fmax, int((fmax-fmin)/df+1))
@@ -379,12 +360,6 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
             split_data = data[ns*nsamplesize_t:(ns+1)*nsamplesize_t, :]
             split_headers = headers[ns*nsamplesize_t:(ns+1)*nsamplesize_t]
             
-#            print('split_data.shape', split_data.shape)
-#            print('split_data', split_data)
-#            print('data', data[ns*nsamplesize_t])
-#            print('data', data[(ns+1)*nsamplesize_t-1])
-#            print(nmax)
-            
             indices = np.arange(sampsnap_input['skip_nsteps'],
                                 nmax+sampsnap_input['pm_nsteps'],
                                 sampsnap_input['every_nsteps'])
@@ -397,12 +372,6 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
             print('indices1', indices)
 #            print(np.logical_and(indices >= 0, indices <= (nmax-1)))
             indices = indices[np.logical_and(indices >= 0, indices <= (nmax-1))]
-            
-#            if indices[0] < 0:
-#                indices[0] = 0
-#            if indices[-1] > nmax-1:
-#                indices[-1] = nmax-1
-            print('indices', indices)
             
 #            metadata = header[sample_times]
             sampled_snaps = np.zeros((indices.size, data.shape[1]), dtype=data.dtype)
@@ -424,7 +393,6 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 selector = np.logical_and(fft_freq <  (f0+df/2),
                                           fft_freq >= (f0-df/2))
                 
-                
                 dat_fft_select = dat_fft * selector[:, np.newaxis, np.newaxis]
                 dat_fft_select_ifft = np.fft.irfft(dat_fft_select, axis=0) 
                 
@@ -434,17 +402,26 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 sampled_snaps[:,ach[0]:ach[1]]['yu'] = dat_fft_select_ifft[indices,:,1] + pos0['yu'][ach[0]:ach[1]]
                 sampled_snaps[:,ach[0]:ach[1]]['zu'] = dat_fft_select_ifft[indices,:,2] + pos0['zu'][ach[0]:ach[1]]
                 
-#                fig, ax = plt.subplots()
-#                ax.plot(fft_freq/1e12, np.sum(np.abs(dat_fft)**2, axis=(1,2))*fft_freq**2, label='rawfft')
-#                ax.plot(fft_freq/1e12, np.sum(np.abs(dat_fft_select)**2, axis=(1,2))*fft_freq**2, label='selected fft')
-#                plt.show()
-            
             for sampsnap in sampled_snaps:
                 sampled_data[-1][1].append(sampsnap)
             
             for samphead in split_headers[indices]:
                 sampled_headers[-1][1].append(samphead)
-            
+    
+    
+    if 'uniform_magmom_dir' in sampsnap_input.keys():
+        sampled_data[-1][1]['mx'] = sampsnap_input['uniform_magmom_dir'][0]
+        sampled_data[-1][1]['my'] = sampsnap_input['uniform_magmom_dir'][1]
+        sampled_data[-1][1]['mz'] = sampsnap_input['uniform_magmom_dir'][2]
+
+    if 'Biso' in sampsnap_input.keys():
+        for ii, Biso in enumerate(sampsnap_input['Biso']):
+            sampled_data[-1][1]['Biso'][sampled_data[-1][1]['type'] == (ii+1)] = Biso
+
+    if 'magnetic_moments' in sampsnap_input.keys():
+        for ii, mm in enumerate(sampsnap_input['magnetic_moments']):
+            sampled_data[-1][1]['mabs'][sampled_data[-1][1]['type'] == (ii+1)] = mm
+
             
 #            fig = plt.figure()
 #            ax = fig.add_subplot(projection='3d')
