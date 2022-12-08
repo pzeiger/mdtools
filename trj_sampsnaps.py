@@ -8,7 +8,7 @@ import sys
 import os
 from mdtools import io as mdio
 import numpy.lib.recfunctions as rf
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from pathlib import Path
 
