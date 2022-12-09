@@ -290,22 +290,25 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     # Total number of samples in the trajectory
     nsamples_t = data.shape[0]
     nsamplesize_t = int((nsamples_t - nsamples_t % nsplit)/ nsplit)
-    
     print(nsamplesize_t)
+
+    # number of atoms
+    natoms = data.shape[1]
+    print(natoms)
     
     # get the FFT frequencies
     fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=trj.dt)
     print(fft_freq)
     
     # Get the equilibrium positions of the data
-    equpos = np.zeros(data.shape[1], dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
-                                                     'formats': ['f8', 'f8', 'f8']}))
+    equpos = np.zeros(natoms, dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
+                                              'formats': ['f8', 'f8', 'f8']}))
     equpos['xu'] = np.mean(data['xu'], axis=0)
     equpos['yu'] = np.mean(data['yu'], axis=0)
     equpos['zu'] = np.mean(data['zu'], axis=0)
     
-    pos0 = np.zeros(data.shape[1], dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
-                                                   'formats': ['f8', 'f8', 'f8']}))
+    pos0 = np.zeros(natoms, dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
+                                            'formats': ['f8', 'f8', 'f8']}))
     pos0['xu'] = trj.data0['xu']
     pos0['yu'] = trj.data0['yu']
     pos0['zu'] = trj.data0['zu']
@@ -333,10 +336,10 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     # This is a list of frequencies, which we want to sample
     freqs = np.linspace(fmin, fmax, int((fmax-fmin)/df+1))
     
-    if data.shape[1] < chunksize:
-        atchunks = np.arange(0, data.shape[1], chunksize)
+    if natoms < chunksize:
+        atchunks = np.arange(0, natoms, chunksize)
     else:
-        atchunks = np.arange(0, data.shape[1], chunksize)
+        atchunks = np.arange(0, natoms, chunksize)
     
     atchunks = [(x, x+chunksize) for x in atchunks]
     
@@ -347,7 +350,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     
     for f0 in freqs:
         
-        sampled_data.append((f0, []))
+        tmp_data = []
         sampled_headers.append((f0, []))
         
         print('%04.1fTHz' % (f0/1e12))
@@ -374,7 +377,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
             indices = indices[np.logical_and(indices >= 0, indices <= (nmax-1))]
             
 #            metadata = header[sample_times]
-            sampled_snaps = np.zeros((indices.size, data.shape[1]), dtype=data.dtype)
+            sampled_snaps = np.zeros((indices.size, natoms), dtype=data.dtype)
             
             # Candidate for parallelisation
             for ach in atchunks:
@@ -401,26 +404,50 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 sampled_snaps[:,ach[0]:ach[1]]['xu'] = dat_fft_select_ifft[indices,:,0] + pos0['xu'][ach[0]:ach[1]]
                 sampled_snaps[:,ach[0]:ach[1]]['yu'] = dat_fft_select_ifft[indices,:,1] + pos0['yu'][ach[0]:ach[1]]
                 sampled_snaps[:,ach[0]:ach[1]]['zu'] = dat_fft_select_ifft[indices,:,2] + pos0['zu'][ach[0]:ach[1]]
-                
-            for sampsnap in sampled_snaps:
-                sampled_data[-1][1].append(sampsnap)
+            
+            
+            tmp_data.append(sampled_snaps)
             
             for samphead in split_headers[indices]:
                 sampled_headers[-1][1].append(samphead)
-    
-    
-    if 'uniform_magmom_dir' in sampsnap_input.keys():
-        sampled_data[-1][1]['mx'] = sampsnap_input['uniform_magmom_dir'][0]
-        sampled_data[-1][1]['my'] = sampsnap_input['uniform_magmom_dir'][1]
-        sampled_data[-1][1]['mz'] = sampsnap_input['uniform_magmom_dir'][2]
+        
+        dtype_data = data.dtype
+        fields = dtype_data.fields.keys()
+        names = list(dtype_data.fields.keys()) + sampsnap_input['extra_field_names']
+        formats = [dtype_data.fields[field][0] for field in fields] + sampsnap_input['extra_field_formats']
+        
+        dtype = np.dtype({'names':    names,
+                          'formats':  formats,
+                         })
+        
+        nsnaps = sum([x.shape[0] for x in tmp_data])
+        print('nsnaps', nsnaps)
+        
+        tmp = np.zeros((nsnaps, natoms), dtype=dtype)
+        tmp2 = np.zeros((nsnaps, natoms), dtype=data.dtype)
+        
+        nstart = 0
+        for tdat in tmp_data: 
+            tmp2[nstart:nstart+tdat.shape[0]] = tdat
+            nstart += tdat.shape[0] 
+        
+        copy_columns_structured_array(tmp2, tmp)
+        
+        sampled_data.append((f0, tmp))
+        
+        # now we build the right data structure 
+        if 'uniform_magmom_dir' in sampsnap_input.keys():
+            sampled_data[-1][1]['mx'] = sampsnap_input['uniform_magmom_dir'][0]
+            sampled_data[-1][1]['my'] = sampsnap_input['uniform_magmom_dir'][1]
+            sampled_data[-1][1]['mz'] = sampsnap_input['uniform_magmom_dir'][2]
 
-    if 'Biso' in sampsnap_input.keys():
-        for ii, Biso in enumerate(sampsnap_input['Biso']):
-            sampled_data[-1][1]['Biso'][sampled_data[-1][1]['type'] == (ii+1)] = Biso
+        if 'Biso' in sampsnap_input.keys():
+            for ii, Biso in enumerate(sampsnap_input['Biso']):
+                sampled_data[-1][1]['Biso'][sampled_data[-1][1]['type'] == (ii+1)] = Biso
 
-    if 'magnetic_moments' in sampsnap_input.keys():
-        for ii, mm in enumerate(sampsnap_input['magnetic_moments']):
-            sampled_data[-1][1]['mabs'][sampled_data[-1][1]['type'] == (ii+1)] = mm
+        if 'magnetic_moments' in sampsnap_input.keys():
+            for ii, mm in enumerate(sampsnap_input['magnetic_moments']):
+                sampled_data[-1][1]['mabs'][sampled_data[-1][1]['type'] == (ii+1)] = mm
 
             
 #            fig = plt.figure()
@@ -591,6 +618,7 @@ def main(argv):
     
     print(sampled_data)
     print(sampled_headers)
+    print('\n')
     
     if 'fftfreqsel' in sampsnap_input:
         for tmpdata, tmpheaders in zip(sampled_data, sampled_headers):
