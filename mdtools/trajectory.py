@@ -391,11 +391,21 @@ class LammpsTrj(Trajectory):
                 if save == 'Masses':
                     masses[tmp[0]] = np.double(tmp[1])
                 elif save == 'Atoms':
-                    data[atindex]['id'] = np.int(tmp[0])
-                    data[atindex]['type'] = np.int(tmp[1])
-                    data[atindex]['xu'] = np.double(tmp[2])
-                    data[atindex]['yu'] = np.double(tmp[3])
-                    data[atindex]['zu'] = np.double(tmp[4])
+                    if atomstyle.lower() == 'atomic':
+                        data[atindex]['id'] = np.int(tmp[0])
+                        data[atindex]['type'] = np.int(tmp[1])
+                        data[atindex]['xu'] = np.double(tmp[2])
+                        data[atindex]['yu'] = np.double(tmp[3])
+                        data[atindex]['zu'] = np.double(tmp[4])
+                    elif atomstyle.lower() == 'charge':
+                        data[atindex]['id'] = np.int(tmp[0])
+                        data[atindex]['type'] = np.int(tmp[1])
+                        data[atindex]['charge'] = np.double(tmp[2])
+                        data[atindex]['xu'] = np.double(tmp[3])
+                        data[atindex]['yu'] = np.double(tmp[4])
+                        data[atindex]['zu'] = np.double(tmp[5])
+                    else:
+                        raise NotImplementedError("Don't know how to load data for atomstyle %s" % atomstyle)
                     atindex += 1
                     continue
                 elif save == 'Velocities':
