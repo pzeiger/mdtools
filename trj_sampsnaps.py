@@ -280,7 +280,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     fmin = sampsnap_input['fftfreqsel']['fmin']
     fmax = sampsnap_input['fftfreqsel']['fmax']
     nsplit = sampsnap_input['fftfreqsel']['nsplit']
-    chunksize = 1000
+    chunksize = sampsnap_input['fftfreqsel']['chunksize']
     
     data = trj.data
     headers = trj.header
@@ -298,6 +298,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     
     # get the FFT frequencies
     fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=trj.dt)
+    nfft = fft_freq.shape[0]
     print(fft_freq)
     
     # Get the equilibrium positions of the data
@@ -329,9 +330,9 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     equpos['zu'][pos0['zu']-equpos['zu'] >=  box_dim['z']/2] += box_dim['z']
     equpos['zu'][pos0['zu']-equpos['zu'] <= -box_dim['z']/2] -= box_dim['z']
     
-    print('maximum deviation from perfect crystal position in x: %f', np.abs(pos0['xu']-equpos['xu']).max())
-    print('maximum deviation from perfect crystal position in y: %f', np.abs(pos0['yu']-equpos['yu']).max())
-    print('maximum deviation from perfect crystal position in z: %f', np.abs(pos0['zu']-equpos['zu']).max())
+    print('max deviation of mean pos from perfect crystal pos in x: %f', np.abs(pos0['xu']-equpos['xu']).max())
+    print('max deviation of mean pos from perfect crystal pos in y: %f', np.abs(pos0['yu']-equpos['yu']).max())
+    print('max deviation of mean pos from perfect crystal pos in z: %f', np.abs(pos0['zu']-equpos['zu']).max())
     
     # This is a list of frequencies, which we want to sample
     freqs = np.linspace(fmin, fmax, int((fmax-fmin)/df+1))
@@ -348,12 +349,16 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     sampled_data = []
     sampled_headers = [] 
     
+    debug_dat = {}
+    
     for f0 in freqs:
         
         tmp_data = []
         sampled_headers.append((f0, []))
         
-        print('%04.1fTHz' % (f0/1e12))
+        f0str = '%04.1fTHz' % (f0/1e12)
+        print(f0str)
+        debug_dat[f0str] = []
         
         # Loop over the splits of the trajectory
         for ns in range(nsplit):
@@ -379,6 +384,12 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
 #            metadata = header[sample_times]
             sampled_snaps = np.zeros((indices.size, natoms), dtype=data.dtype)
             
+            unique_types = np.unique(split_data['type'])
+            tmp_out = {}
+            tmp_out['fft_select'] = np.zeros((nfft, unique_types.shape[0], 3))
+            tmp_out['fft'] = np.zeros((nfft, unique_types.shape[0], 3)) 
+            debug_dat[f0str].append(tmp_out) 
+            
             # Candidate for parallelisation
             for ach in atchunks:
                 
@@ -391,13 +402,32 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 
                 dat_fft = np.fft.rfft(tmp, axis=0)
                 
-                dat_fft_ifft = np.fft.irfft(dat_fft, axis=0)
+#                dat_fft_ifft = np.fft.irfft(dat_fft, n=dat_fft.shape[0], axis=0)
                 
                 selector = np.logical_and(fft_freq <  (f0+df/2),
                                           fft_freq >= (f0-df/2))
                 
                 dat_fft_select = dat_fft * selector[:, np.newaxis, np.newaxis]
-                dat_fft_select_ifft = np.fft.irfft(dat_fft_select, axis=0) 
+                dat_fft_select_ifft = np.fft.irfft(dat_fft_select, n=tmp.shape[0], axis=0)
+                print(dat_fft_select.shape)
+                print(dat_fft_select_ifft.shape)
+
+                sum_dat_fft_select = []
+                sum_dat_fft = []
+                for typ in np.unique(split_chunked_data['type']):
+                    typ_selector = split_chunked_data['type'][0,:] == typ
+                    print(typ_selector.shape)
+                    sum_dat_fft_select.append(np.sum(np.abs(dat_fft_select[:,typ_selector,:])**2*fft_freq**2, axis=(1)))
+                    sum_dat_fft.append(np.sum(np.abs(dat_fft[:,typ_selector,:])**2*fft_freq**2, axis=(1)))
+                    print(sum_dat_fft_select[-1].shape)
+                    print(sum_dat_fft[-1].shape)
+                
+                sum_dat_fft_select = np.moveaxis(np.array(sum_dat_fft_select), 0, 1)
+                sum_dat_fft = np.moveaxis(np.array(sum_dat_fft), 0, 1)
+                print(sum_dat_fft_select.shape)
+                print(sum_dat_fft.shape)
+                debug_dat[f0str][-1]['fft_select'] += sum_dat_fft_select
+                debug_dat[f0str][-1]['fft'] += sum_dat_fft
                 
                 sampled_snaps[:,ach[0]:ach[1]]['id'] = split_chunked_data['id'][indices,:]
                 sampled_snaps[:,ach[0]:ach[1]]['type'] = split_chunked_data['type'][indices,:]
@@ -468,6 +498,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
 #            ax.scatter(sampled_snaps['xu'], sampled_snaps['yu'], sampled_snaps['zu'])
 #            plt.show()
     
+    np.savez_compressed('debug_dat.npz', debug_dat=debug_dat)
     
     return sampled_data, sampled_headers
 
@@ -488,6 +519,7 @@ def process_input(inputfile):
                           'uniform_magmom_dir',
                           'magnetic_moments',
                           'fftfreqsel',
+                          'chunksize',
                           )
     
     # Get settings from file
@@ -582,6 +614,7 @@ def main(argv):
     inputfile = 'trj_sampsnaps.in'
     fname = 'trj.npz'
     fout = 'trj_sampsnaps.npz'
+    chunksize = 1000
     
     if len(argv) > 1:
         inputfile = argv[1]
@@ -605,6 +638,9 @@ def main(argv):
     if sampsnap_input['dname'] != '':
         sampsnap_input['dname'] = './' + sampsnap_input['dname'] + '/'
     
+    if 'chunksize' not in sampsnap_input['fftfreqsel'].keys():
+        sampsnap_input['fftfreqsel']['chunksize'] = chunksize 
+    
     print(sampsnap_input)
     
     print('Loading data from ', sampsnap_input['trjfile'])
@@ -622,7 +658,7 @@ def main(argv):
     
     if 'fftfreqsel' in sampsnap_input:
         for tmpdata, tmpheaders in zip(sampled_data, sampled_headers):
-            subdir = '%04.1fThz' % (tmpdata[0]/1e12 )
+            subdir = '%04.1fTHz' % (tmpdata[0]/1e12 )
             output_snapshots(tmpdata[1], tmpheaders[1], sampsnap_input['attype_conversion'],
                              sampsnap_input['snapshot_style'], subdirectory=subdir)
     else:
