@@ -417,8 +417,8 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 for typ in np.unique(split_chunked_data['type']):
                     typ_selector = split_chunked_data['type'][0,:] == typ
                     print(typ_selector.shape)
-                    sum_dat_fft_select.append(np.sum(np.abs(dat_fft_select[:,typ_selector,:])**2*fft_freq**2, axis=(1)))
-                    sum_dat_fft.append(np.sum(np.abs(dat_fft[:,typ_selector,:])**2*fft_freq**2, axis=(1)))
+                    sum_dat_fft_select.append(np.sum(np.abs(dat_fft_select[:,typ_selector,:])**2*fft_freq[:,np.newaxis,np.newaxis]**2, axis=(1)))
+                    sum_dat_fft.append(np.sum(np.abs(dat_fft[:,typ_selector,:])**2*fft_freq[:,np.newaxis,np.newaxis]**2, axis=(1)))
                     print(sum_dat_fft_select[-1].shape)
                     print(sum_dat_fft[-1].shape)
                 
