@@ -243,6 +243,16 @@ class Trajectory():
         return atomlist
     
     
+    def get_atids_by_modulo(self, modulus=1, remainder=0):
+        """
+        """
+        print(self.data[0]['id'] % modulus)
+        print(np.sum((self.data[0]['id'] - 1) % modulus == remainder))
+        atomlist = self.data[0][np.isin((self.data[0]['id'] - 1) % modulus, remainder)]['id']
+        print(atomlist.shape)
+        return atomlist
+    
+    
     def trj2npz(self, fname):
         
         trj_prop = {

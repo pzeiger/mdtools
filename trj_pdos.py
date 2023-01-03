@@ -141,6 +141,23 @@ def pdos(pdos_input, trj):
             pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
             ppdos['attypes'][str(typ)] = pdoss
     
+    if 'modulus_atid' in pdos_input.keys():
+        print('\n', 'modulus_atid')
+        print(pdos_input['modulus_atid'])
+        
+        modulus = pdos_input['modulus_atid']
+        ppdos['modulus_atid'] = {}
+        ppdos['modulus_atid']['modulus'] = modulus
+        ppdos['modulus_atid']['remainder'] = {}
+        
+        for remainder in range(modulus):
+            print('Currently processing atoms with id %i modulus:' \
+                  % modulus, remainder)
+            atomlist = trj.get_atids_by_modulo(modulus, remainder)
+            pdoss = compute_pdos(trj, atomlist, split_natoms=pdos_input['split_natoms'])
+            ppdos['modulus_atid']['remainder'][str(remainder)] = pdoss
+        
+
     return ppdos
 
 
@@ -239,6 +256,7 @@ def process_input(inputfile):
                           'split_natoms',
                           'outputfile',
                           'compressed',
+                          'modulus_atid',
                           'attype2mass',)
     
     # Get settings from file
@@ -277,6 +295,9 @@ def process_input(inputfile):
     
     if 'split_natoms' in pdos_input.keys():
         pdos_input['split_natoms'] = int(pdos_input['split_natoms'][-1])
+    
+    if 'modulus_atid' in pdos_input.keys():
+        pdos_input['modulus_atid'] = int(pdos_input['modulus_atid'][-1])
     
     if 'compressed' in pdos_input.keys():
         pdos_input['compressed'] = bool(pdos_input['compressed'][-1])
