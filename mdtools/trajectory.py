@@ -356,16 +356,23 @@ class LammpsTrj(Trajectory):
                     else:
                         atomstyle = tmp[1]
                     if atomstyle.lower() == 'atomic':
-                        header['ATOMS'] = ['id', 'type', 'xu', 'yu', 'zu']
+                        header['ATOMS'] = ['id', 'type', 'xu', 'yu', 'zu', 'nx', 'ny', 'nz']
                         dtype={'names': header['ATOMS'],
                                'formats': ('u4', 'u1', 'f8', 'f8', 'f8', 'i', 'i', 'i')}
                         
                         data = np.array(np.empty(header['NUMBER OF ATOMS']), dtype=dtype)
                         print(data.shape)
                     elif atomstyle.lower() == 'charge':
-                        header['ATOMS'] = ['id', 'type', 'charge', 'xu', 'yu', 'zu']
+                        header['ATOMS'] = ['id', 'type', 'charge', 'xu', 'yu', 'zu', 'nx', 'ny', 'nz']
                         dtype={'names': header['ATOMS'],
                                'formats': ('u4', 'u1', 'f8', 'f8', 'f8', 'f8', 'i', 'i', 'i')}
+                        
+                        data = np.array(np.empty(header['NUMBER OF ATOMS']), dtype=dtype)
+                        print(data.shape)
+                    elif atomstyle.lower() == 'full':
+                        header['ATOMS'] = ['id', 'molid', 'type', 'charge', 'xu', 'yu', 'zu', 'nx', 'ny', 'nz']
+                        dtype={'names': header['ATOMS'],
+                               'formats': ('u4', 'u1', 'u1', 'f8', 'f8', 'f8', 'f8', 'f8', 'i', 'i', 'i')}
                         
                         data = np.array(np.empty(header['NUMBER OF ATOMS']), dtype=dtype)
                         print(data.shape)
@@ -407,6 +414,9 @@ class LammpsTrj(Trajectory):
                         data[atindex]['xu'] = np.double(tmp[2])
                         data[atindex]['yu'] = np.double(tmp[3])
                         data[atindex]['zu'] = np.double(tmp[4])
+                        data[atindex]['nx'] = np.double(tmp[5])
+                        data[atindex]['ny'] = np.double(tmp[6])
+                        data[atindex]['nz'] = np.double(tmp[7])
                     elif atomstyle.lower() == 'charge':
                         data[atindex]['id'] = np.int(tmp[0])
                         data[atindex]['type'] = np.int(tmp[1])
@@ -414,6 +424,20 @@ class LammpsTrj(Trajectory):
                         data[atindex]['xu'] = np.double(tmp[3])
                         data[atindex]['yu'] = np.double(tmp[4])
                         data[atindex]['zu'] = np.double(tmp[5])
+                        data[atindex]['nx'] = np.double(tmp[6])
+                        data[atindex]['ny'] = np.double(tmp[7])
+                        data[atindex]['nz'] = np.double(tmp[8])
+                    elif atomstyle.lower() == 'full':
+                        data[atindex]['id'] = np.int(tmp[0])
+                        data[atindex]['molid'] = np.int(tmp[1])
+                        data[atindex]['type'] = np.int(tmp[2])
+                        data[atindex]['charge'] = np.double(tmp[3])
+                        data[atindex]['xu'] = np.double(tmp[4])
+                        data[atindex]['yu'] = np.double(tmp[5])
+                        data[atindex]['zu'] = np.double(tmp[6])
+                        data[atindex]['nx'] = np.double(tmp[7])
+                        data[atindex]['ny'] = np.double(tmp[8])
+                        data[atindex]['nz'] = np.double(tmp[9])
                     else:
                         raise NotImplementedError("Don't know how to load data for atomstyle %s" % atomstyle)
                     atindex += 1
