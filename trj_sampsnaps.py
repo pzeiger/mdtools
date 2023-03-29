@@ -638,7 +638,8 @@ def main(argv):
     if sampsnap_input['dname'] != '':
         sampsnap_input['dname'] = './' + sampsnap_input['dname'] + '/'
     
-    if 'chunksize' not in sampsnap_input['fftfreqsel'].keys():
+    if 'fftfreqsel' in sampsnap_input and \
+       'chunksize' not in sampsnap_input['fftfreqsel'].keys():
         sampsnap_input['fftfreqsel']['chunksize'] = chunksize 
     
     print(sampsnap_input)
