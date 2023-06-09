@@ -463,6 +463,8 @@ class LammpsTrj(Trajectory):
         yz = header['BOX']['yz']
         header['BOX']['matrix'] = np.array([[xx, xy, xz], [0.0, yy, yz], [0.0, 0.0, zz]])
         
+        # Our code assumes an ordered in data file, but that might not be the case
+        data.sort(order='id')
         self.data0 = data
         self.header0 = header
         print(self.header0)
