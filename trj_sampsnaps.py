@@ -332,9 +332,9 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     equpos['zu'][pos0['zu']-equpos['zu'] >=  box_dim['z']/2] += box_dim['z']
     equpos['zu'][pos0['zu']-equpos['zu'] <= -box_dim['z']/2] -= box_dim['z']
     
-    print('avg deviation of mean pos from perfect crystal pos in x: %f', np.abs(pos0['xu']-equpos['xu']).avg())
-    print('avg deviation of mean pos from perfect crystal pos in y: %f', np.abs(pos0['yu']-equpos['yu']).avg())
-    print('avg deviation of mean pos from perfect crystal pos in z: %f', np.abs(pos0['zu']-equpos['zu']).avg())
+    print('avg deviation of mean pos from perfect crystal pos in x: %f', np.abs(pos0['xu']-equpos['xu']).mean())
+    print('avg deviation of mean pos from perfect crystal pos in y: %f', np.abs(pos0['yu']-equpos['yu']).mean())
+    print('avg deviation of mean pos from perfect crystal pos in z: %f', np.abs(pos0['zu']-equpos['zu']).mean())
     print('max deviation of mean pos from perfect crystal pos in x: %f', np.abs(pos0['xu']-equpos['xu']).max())
     print('max deviation of mean pos from perfect crystal pos in y: %f', np.abs(pos0['yu']-equpos['yu']).max())
     print('max deviation of mean pos from perfect crystal pos in z: %f', np.abs(pos0['zu']-equpos['zu']).max())
