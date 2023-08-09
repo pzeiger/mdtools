@@ -282,13 +282,6 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     nsplit = sampsnap_input['fftfreqsel']['nsplit']
     chunksize = sampsnap_input['fftfreqsel']['chunksize']
    
-    # get perfect crystal positions
-    pos0 = np.zeros(natoms, dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
-                                            'formats': ['f8', 'f8', 'f8']}))
-    pos0['xu'] = trj.data0['xu']
-    pos0['yu'] = trj.data0['yu']
-    pos0['zu'] = trj.data0['zu']
-    
     # Now we get the trajectory data
     data = trj.data
     headers = trj.header
@@ -308,6 +301,13 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=trj.dt)
     nfft = fft_freq.shape[0]
     print(fft_freq)
+    
+    # get perfect crystal positions
+    pos0 = np.zeros(natoms, dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
+                                            'formats': ['f8', 'f8', 'f8']}))
+    pos0['xu'] = trj.data0['xu']
+    pos0['yu'] = trj.data0['yu']
+    pos0['zu'] = trj.data0['zu']
     
     # Get the equilibrium positions of the data
     equpos = np.zeros(natoms, dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
