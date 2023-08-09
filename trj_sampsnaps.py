@@ -281,7 +281,15 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     fmax = sampsnap_input['fftfreqsel']['fmax']
     nsplit = sampsnap_input['fftfreqsel']['nsplit']
     chunksize = sampsnap_input['fftfreqsel']['chunksize']
+   
+    # get perfect crystal positions
+    pos0 = np.zeros(natoms, dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
+                                            'formats': ['f8', 'f8', 'f8']}))
+    pos0['xu'] = trj.data0['xu']
+    pos0['yu'] = trj.data0['yu']
+    pos0['zu'] = trj.data0['zu']
     
+    # Now we get the trajectory data
     data = trj.data
     headers = trj.header
     
@@ -308,12 +316,6 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     equpos['yu'] = np.mean(data['yu'], axis=0)
     equpos['zu'] = np.mean(data['zu'], axis=0)
     
-    pos0 = np.zeros(natoms, dtype=np.dtype({'names':   ['xu', 'yu', 'zu'],
-                                            'formats': ['f8', 'f8', 'f8']}))
-    pos0['xu'] = trj.data0['xu']
-    pos0['yu'] = trj.data0['yu']
-    pos0['zu'] = trj.data0['zu']
-    
     box_dim = {
         'x':   trj.header0['BOX BOUNDS'][0,1] - trj.header0['BOX BOUNDS'][0,0],
         'y':   trj.header0['BOX BOUNDS'][1,1] - trj.header0['BOX BOUNDS'][1,0],
@@ -330,9 +332,17 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     equpos['zu'][pos0['zu']-equpos['zu'] >=  box_dim['z']/2] += box_dim['z']
     equpos['zu'][pos0['zu']-equpos['zu'] <= -box_dim['z']/2] -= box_dim['z']
     
+    print('avg deviation of mean pos from perfect crystal pos in x: %f', np.abs(pos0['xu']-equpos['xu']).avg())
+    print('avg deviation of mean pos from perfect crystal pos in y: %f', np.abs(pos0['yu']-equpos['yu']).avg())
+    print('avg deviation of mean pos from perfect crystal pos in z: %f', np.abs(pos0['zu']-equpos['zu']).avg())
     print('max deviation of mean pos from perfect crystal pos in x: %f', np.abs(pos0['xu']-equpos['xu']).max())
     print('max deviation of mean pos from perfect crystal pos in y: %f', np.abs(pos0['yu']-equpos['yu']).max())
     print('max deviation of mean pos from perfect crystal pos in z: %f', np.abs(pos0['zu']-equpos['zu']).max())
+    
+    # we get now the displacements only 
+    data['xu'] = data['xu'] - pos0['xu']
+    data['yu'] = data['yu'] - pos0['yu']
+    data['zu'] = data['zu'] - pos0['zu']
     
     # This is a list of frequencies, which we want to sample
     freqs = np.linspace(fmin, fmax, int((fmax-fmin)/df+1))
