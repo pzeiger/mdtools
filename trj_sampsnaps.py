@@ -298,7 +298,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     print(natoms)
     
     # get the FFT frequencies
-    fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=trj.dt)
+    fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=sampsnap_input['every_nsteps']*trj.dt)
     nfft = fft_freq.shape[0]
     print(fft_freq)
     
@@ -425,7 +425,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 sum_dat_fft_select = []
                 sum_dat_fft = []
                 for typ in range(unique_types.shape[0]):
-                    typ_selector = split_chunked_data['type'][0,:] == typ
+                    typ_selector = split_chunked_data['type'][0,:] == (typ+1)
                     print(typ_selector.shape)
                     sum_dat_fft_select.append(np.sum(np.abs(dat_fft_select[:,typ_selector,:])**2*fft_freq[:,np.newaxis,np.newaxis]**2, axis=(1)))
                     sum_dat_fft.append(np.sum(np.abs(dat_fft[:,typ_selector,:])**2*fft_freq[:,np.newaxis,np.newaxis]**2, axis=(1)))
