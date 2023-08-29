@@ -102,9 +102,12 @@ class Trajectory():
             print('alive', self.data0file)
             self.process_data0()
         
-        if self.header == [] and self.data == []:
-            with open(self.trjfile, 'r') as self.fh:
-                self.process_trjfile()
+        print(self.data, self.header)
+        
+        if type(self.header) == 'list' and type(self.data) == 'list':
+            if not self.header and not self.data:
+                with open(self.trjfile, 'r') as self.fh:
+                    self.process_trjfile()
         
         if self.attype2mass == {}:
             print('self.data0file', self.data0file)
