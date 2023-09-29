@@ -199,12 +199,9 @@ def sample_snapshots(trj, sampsnap_input):
     """
     
     if 'fftfreqsel' in sampsnap_input.keys():
-        sampled_data, sampled_headers = sample_snapshots_fftfreqsel(trj, sampsnap_input)
+        return sample_snapshots_fftfreqsel(trj, sampsnap_input)
     else:
-        sampled_data, sampled_headers = sample_snapshots_trj(trj, sampsnap_input)
-    return sampled_data, sampled_headers
-
-
+        return sample_snapshots_trj(trj, sampsnap_input)
 
 
 
@@ -357,6 +354,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     print('atchunks', atchunks)
     
     sampled_data = []
+    sampled_freqs = []
     sampled_headers = [] 
     
     debug_dat = {}
@@ -364,7 +362,8 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     for f0 in freqs:
         
         tmp_data = []
-        sampled_headers.append((f0, []))
+        sampled_freqs.append(f0)
+        sampled_headers.append([])
         
         f0str = '%04.1fTHz' % (f0/1e12)
         print(f0str)
@@ -449,7 +448,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
             tmp_data.append(sampled_snaps)
             
             for samphead in split_headers[indices]:
-                sampled_headers[-1][1].append(samphead)
+                sampled_headers[-1].append(samphead)
         
         dtype_data = data.dtype
         fields = dtype_data.fields.keys()
@@ -473,7 +472,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
         
         copy_columns_structured_array(tmp2, tmp)
         
-        sampled_data.append((f0, tmp))
+        sampled_data.append(tmp)
         
         # now we build the right data structure 
         if 'uniform_magmom_dir' in sampsnap_input.keys():
@@ -510,7 +509,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     
     np.savez_compressed('debug_dat.npz', debug_dat=debug_dat)
     
-    return sampled_data, sampled_headers
+    return sampled_freqs, sampled_data, sampled_headers
 
 
 
@@ -661,33 +660,46 @@ def main(argv):
     
     print('Loaded data.')
     
-    sampled_data, sampled_headers = sample_snapshots(trj, sampsnap_input)
+    samples = sample_snapshots(trj, sampsnap_input)
+    
+    if 'fftfreqsel' in sampsnap_input:
+        sampled_freqs = samples[0]
+        sampled_data = samples[1]
+        sampled_headers = samples[2]
+    else:
+        sampled_data = samples[0]
+        sampled_headers = samples[1]
     
     print(sampled_data)
     print(sampled_headers)
     print('\n')
     
     if 'fftfreqsel' in sampsnap_input:
-        for tmpdata, tmpheaders in zip(sampled_data, sampled_headers):
-            subdir = '%04.1fTHz' % (tmpdata[0]/1e12 )
-            output_snapshots(tmpdata[1], tmpheaders[1], sampsnap_input['attype_conversion'],
+        for tmpfreq, tmpdata, tmpheader in zip(sampled_freqs, sampled_data, sampled_headers):
+            subdir = '%04.1fTHz' % (tmpfreq/1e12 )
+            output_snapshots(tmpdata, tmpheader, sampsnap_input['attype_conversion'],
                              sampsnap_input['snapshot_style'], subdirectory=subdir)
     else:
         output_snapshots(sampled_data, sampled_headers, sampsnap_input['attype_conversion'],
                          sampsnap_input['snapshot_style'])
     
     
-    # Save pdos information to numpy archive
+    # Save snapshots to numpy archive
+    output_args = {
+        'sampled_headers':  sampled_headers,
+        'sampled_data':     sampled_data,
+        'sampsnap_input': sampsnap_input,
+    }
+    
+    if 'fftfreqsel' in sampsnap_input:
+        output_args['sampled_freqs'] = sampled_freqs
+    
     if sampsnap_input['compressed']:
-        np.savez_compressed(sampsnap_input['dname'] + fout, 
-                            sampled_headers=sampled_headers,
-                            sampled_data=sampled_data,
-                            sampsnap_input=sampsnap_input,)
+        print(sampled_data)
+        np.savez_compressed(sampsnap_input['dname'] + fout, **output_args)
     else:
-        np.savez(sampsnap_input['dname'] + fout, 
-                 sampled_headers=sampled_headers,
-                 sampled_data=sampled_data,
-                 sampsnap_input=sampsnap_input,)
+        np.savez(sampsnap_input['dname'] + fout, **output_args)
+    
     return None
 
 
