@@ -412,8 +412,8 @@ class LammpsTrj(Trajectory):
                     masses[tmp[0]] = np.double(tmp[1])
                 elif save == 'Atoms':
                     if atomstyle.lower() == 'atomic':
-                        data[atindex]['id'] = np.int(tmp[0])
-                        data[atindex]['type'] = np.int(tmp[1])
+                        data[atindex]['id'] = np.int_(tmp[0])
+                        data[atindex]['type'] = np.int_(tmp[1])
                         data[atindex]['xu'] = np.double(tmp[2])
                         data[atindex]['yu'] = np.double(tmp[3])
                         data[atindex]['zu'] = np.double(tmp[4])
@@ -421,8 +421,8 @@ class LammpsTrj(Trajectory):
                         data[atindex]['ny'] = np.double(tmp[6])
                         data[atindex]['nz'] = np.double(tmp[7])
                     elif atomstyle.lower() == 'charge':
-                        data[atindex]['id'] = np.int(tmp[0])
-                        data[atindex]['type'] = np.int(tmp[1])
+                        data[atindex]['id'] = np.int_(tmp[0])
+                        data[atindex]['type'] = np.int_(tmp[1])
                         data[atindex]['charge'] = np.double(tmp[2])
                         data[atindex]['xu'] = np.double(tmp[3])
                         data[atindex]['yu'] = np.double(tmp[4])
@@ -431,9 +431,9 @@ class LammpsTrj(Trajectory):
                         data[atindex]['ny'] = np.double(tmp[7])
                         data[atindex]['nz'] = np.double(tmp[8])
                     elif atomstyle.lower() == 'full':
-                        data[atindex]['id'] = np.int(tmp[0])
-                        data[atindex]['molid'] = np.int(tmp[1])
-                        data[atindex]['type'] = np.int(tmp[2])
+                        data[atindex]['id'] = np.int_(tmp[0])
+                        data[atindex]['molid'] = np.int_(tmp[1])
+                        data[atindex]['type'] = np.int_(tmp[2])
                         data[atindex]['charge'] = np.double(tmp[3])
                         data[atindex]['xu'] = np.double(tmp[4])
                         data[atindex]['yu'] = np.double(tmp[5])
