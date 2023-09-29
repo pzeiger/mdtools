@@ -96,13 +96,14 @@ class Trajectory():
         self.data = data
         self.attype2mass = attype2mass
         
-        print('alive', self.data0)
         
         if self.data0file and self.data0 is None:
             print('alive', self.data0file)
             self.process_data0()
+        else:
+            print('alive', self.data0)
         
-        print(self.data, self.header)
+        print(type(self.data), type(self.header))
         
         if type(self.header) == 'list' and type(self.data) == 'list':
             if not self.header and not self.data:
