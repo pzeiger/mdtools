@@ -103,9 +103,12 @@ class Trajectory():
         else:
             print('alive', self.data0)
         
-        print(type(self.data), type(self.header))
+        print(self.data0)
+
+        print(type(self.data))
+        print(type(self.header))
         
-        if type(self.header) == 'list' and type(self.data) == 'list':
+        if isinstance(self.header, list) and isinstance(self.data, list):
             if not self.header and not self.data:
                 with open(self.trjfile, 'r') as self.fh:
                     self.process_trjfile()
