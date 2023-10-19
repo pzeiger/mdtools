@@ -295,7 +295,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     print(natoms)
     
     # get the FFT frequencies
-    fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=sampsnap_input['every_nsteps']*trj.dt)
+    fft_freq = np.fft.rfftfreq(n=nsamplesize_t, d=trj.samplensteps*trj.dt)
     nfft = fft_freq.shape[0]
     print(fft_freq)
     
@@ -610,7 +610,8 @@ def process_input(inputfile):
             else:
                 tmp[el[0]] = np.double(el[1])
         sampsnap_input['fftfreqsel'] = tmp
-    
+        if 'chunksize' not in sampsnap_input['fftfreqsel'].keys():
+            sampsnap_input['fftfreqsel']['chunksize'] = 1000
 
     return sampsnap_input
 
@@ -623,7 +624,6 @@ def main(argv):
     inputfile = 'trj_sampsnaps.in'
     fname = 'trj.npz'
     fout = 'trj_sampsnaps.npz'
-    chunksize = 1000
     
     if len(argv) > 1:
         inputfile = argv[1]
@@ -647,9 +647,6 @@ def main(argv):
     if sampsnap_input['dname'] != '':
         sampsnap_input['dname'] = './' + sampsnap_input['dname'] + '/'
     
-    if 'fftfreqsel' in sampsnap_input and \
-       'chunksize' not in sampsnap_input['fftfreqsel'].keys():
-        sampsnap_input['fftfreqsel']['chunksize'] = chunksize 
     
     print(sampsnap_input)
     
