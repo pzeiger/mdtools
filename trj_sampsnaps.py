@@ -476,17 +476,17 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
         
         # now we build the right data structure 
         if 'uniform_magmom_dir' in sampsnap_input.keys():
-            sampled_data[-1][1]['mx'] = sampsnap_input['uniform_magmom_dir'][0]
-            sampled_data[-1][1]['my'] = sampsnap_input['uniform_magmom_dir'][1]
-            sampled_data[-1][1]['mz'] = sampsnap_input['uniform_magmom_dir'][2]
+            sampled_data[-1]['mx'] = sampsnap_input['uniform_magmom_dir'][0]
+            sampled_data[-1]['my'] = sampsnap_input['uniform_magmom_dir'][1]
+            sampled_data[-1]['mz'] = sampsnap_input['uniform_magmom_dir'][2]
 
         if 'Biso' in sampsnap_input.keys():
             for ii, Biso in enumerate(sampsnap_input['Biso']):
-                sampled_data[-1][1]['Biso'][sampled_data[-1][1]['type'] == (ii+1)] = Biso
+                sampled_data[-1]['Biso'][sampled_data[-1]['type'] == (ii+1)] = Biso
 
         if 'magnetic_moments' in sampsnap_input.keys():
             for ii, mm in enumerate(sampsnap_input['magnetic_moments']):
-                sampled_data[-1][1]['mabs'][sampled_data[-1][1]['type'] == (ii+1)] = mm
+                sampled_data[-1]['mabs'][sampled_data[-1]['type'] == (ii+1)] = mm
 
             
 #            fig = plt.figure()
