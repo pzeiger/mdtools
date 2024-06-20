@@ -23,8 +23,6 @@ def mkdir_safe(directory):
 
 
 
-
-
 def output_snapshots(data, headers, attype_conversion, style='drprobecel', subdirectory=None):
     """
     """
@@ -57,12 +55,12 @@ def output_snapshots_drprobecel(data, headers, attype_conversion, directory):
     format_write = '%6s  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f  % 15.12f'
     
     for dat, head in zip(data, headers):
-        print(headers)
-        print(len(headers))
-        print(head)
-        print(len(head))
-        print(dat)
-        print(len(dat))
+#        print(headers)
+#        print(len(headers))
+#        print(head)
+#        print(len(head))
+#        print(dat)
+#        print(len(dat))
         snapname = 'snapshot%07d.cel' % head['TIMESTEP']
         assert head['NUMBER OF ATOMS'] == dat.shape[0]
 #        print(dat.shape)
@@ -220,22 +218,22 @@ def sample_snapshots_trj(trj, sampsnap_input):
                         nmax+sampsnap_input['pm_nsteps'],
                         sampsnap_input['every_nsteps'])
     
-    print(indices)
+#    print(indices)
     if sampsnap_input['pm_nsteps'] != 0:
         indices += np.random.randint(low=-sampsnap_input['pm_nsteps'], high=sampsnap_input['pm_nsteps'], size=indices.shape[0])
     if indices[0] < 0:
         indices[0] = 0
     if indices[-1] > nmax-1:
         indices[-1] = nmax-1
-    print(indices)
+#    print(indices)
     
 #    sampled_data = np.zeros(data[indices].shape, dtype=sampsnap_input['sample_dtype'])
 #    copy_columns_structured_array(data[indices], sampled_data)
 
     sampled_data = data[indices]
     sampled_headers = header[indices]
-    print(sampled_data.shape)
-    print(sampled_headers.shape)
+#    print(sampled_data.shape)
+#    print(sampled_headers.shape)
     
     dtype_dat = sampled_data.dtype
     fields = dtype_dat.fields.keys()
@@ -381,16 +379,12 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                                 nmax+sampsnap_input['pm_nsteps'],
                                 sampsnap_input['every_nsteps'])
             
-            print('indices1', indices)
             if sampsnap_input['pm_nsteps'] != 0:
                 indices += np.random.randint(low=-sampsnap_input['pm_nsteps'], 
                                              high=sampsnap_input['pm_nsteps'],
                                              size=indices.shape[0])
-            print('indices1', indices)
-#            print(np.logical_and(indices >= 0, indices <= (nmax-1)))
             indices = indices[np.logical_and(indices >= 0, indices <= (nmax-1))]
             
-#            metadata = header[sample_times]
             sampled_snaps = np.zeros((indices.size, natoms), dtype=data.dtype)
             
             unique_types = np.unique(split_data['type'])
@@ -403,38 +397,39 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
             for ach in atchunks:
                 
                 split_chunked_data = split_data[:,ach[0]:ach[1]]
-                print(split_chunked_data.shape)
+#                print(split_chunked_data.shape)
                 
                 tmp = np.moveaxis(np.array([split_chunked_data['xu'],
                                             split_chunked_data['yu'],
                                             split_chunked_data['zu']]), 0, 2)
                 
                 dat_fft = np.fft.rfft(tmp, axis=0)
-                
-#                dat_fft_ifft = np.fft.irfft(dat_fft, n=dat_fft.shape[0], axis=0)
+                # We explicitly zero the zero frequency component in order to avoid 
+                # any potential trouble if the selector overlaps with it
+                dat_fft[0,:] = .0
                 
                 selector = np.logical_and(fft_freq <  (f0+df/2),
                                           fft_freq >= (f0-df/2))
                 
                 dat_fft_select = dat_fft * selector[:, np.newaxis, np.newaxis]
                 dat_fft_select_ifft = np.fft.irfft(dat_fft_select, n=tmp.shape[0], axis=0)
-                print(dat_fft_select.shape)
-                print(dat_fft_select_ifft.shape)
+#                print(dat_fft_select.shape)
+#                print(dat_fft_select_ifft.shape)
 
                 sum_dat_fft_select = []
                 sum_dat_fft = []
                 for typ in range(unique_types.shape[0]):
                     typ_selector = split_chunked_data['type'][0,:] == (typ+1)
-                    print(typ_selector.shape)
+#                    print(typ_selector.shape)
                     sum_dat_fft_select.append(np.sum(np.abs(dat_fft_select[:,typ_selector,:])**2*fft_freq[:,np.newaxis,np.newaxis]**2, axis=(1)))
                     sum_dat_fft.append(np.sum(np.abs(dat_fft[:,typ_selector,:])**2*fft_freq[:,np.newaxis,np.newaxis]**2, axis=(1)))
-                    print(sum_dat_fft_select[-1].shape)
-                    print(sum_dat_fft[-1].shape)
+#                    print(sum_dat_fft_select[-1].shape)
+#                    print(sum_dat_fft[-1].shape)
                 
                 sum_dat_fft_select = np.moveaxis(np.array(sum_dat_fft_select), 0, 1)
                 sum_dat_fft = np.moveaxis(np.array(sum_dat_fft), 0, 1)
-                print(sum_dat_fft_select.shape)
-                print(sum_dat_fft.shape)
+#                print(sum_dat_fft_select.shape)
+#                print(sum_dat_fft.shape)
                 debug_dat[f0str][-1]['fft_select'] += sum_dat_fft_select
                 debug_dat[f0str][-1]['fft'] += sum_dat_fft
                 
