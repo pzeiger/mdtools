@@ -11,6 +11,8 @@ import numpy.lib.recfunctions as rf
 #import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import Axes3D
 from pathlib import Path
+from scipy import signal
+
 
 
 def mkdir_safe(directory):
@@ -276,6 +278,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     fmax = sampsnap_input['fftfreqsel']['fmax']
     nsplit = sampsnap_input['fftfreqsel']['nsplit']
     chunksize = sampsnap_input['fftfreqsel']['chunksize']
+    alpha = sampsnap_input['fftfreqsel']['alpha']
    
     # Now we get the trajectory data
     data = trj.data
@@ -391,7 +394,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
             tmp_out = {}
             tmp_out['fft_select'] = np.zeros((nfft, unique_types.shape[0], 3))
             tmp_out['fft'] = np.zeros((nfft, unique_types.shape[0], 3)) 
-            debug_dat[f0str].append(tmp_out) 
+            debug_dat[f0str].append(tmp_out)
             
             # Candidate for parallelisation
             for ach in atchunks:
@@ -403,7 +406,16 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                                             split_chunked_data['yu'],
                                             split_chunked_data['zu']]), 0, 2)
                 
-                dat_fft = np.fft.rfft(tmp, axis=0)
+                # We window the signal and rescale the spectrum to similar power
+                window = signal.windows.tukey(tmp.shape[0], alpha=alpha, sym=False)
+                
+                dat_fft = np.fft.rfft(tmp * window[:, np.newaxis, np.newaxis], axis=0)
+                norm = np.sum(np.abs(np.fft.rfft(tmp, axis=0))**2)
+                
+#                dat_fft *= np.sqrt(norm / np.sum(np.abs(dat_fft)**2))
+                print('norm', norm, np.sum(np.abs(dat_fft)**2), np.sqrt(norm / np.sum(np.abs(dat_fft)**2)),)
+#                      np.sum(np.abs(dat_fft * np.sqrt(norm / np.sum(np.abs(dat_fft)**2)))**2))
+                
                 # We explicitly zero the zero frequency component in order to avoid 
                 # any potential trouble if the selector overlaps with it
                 dat_fft[0,:] = .0
@@ -415,7 +427,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 dat_fft_select_ifft = np.fft.irfft(dat_fft_select, n=tmp.shape[0], axis=0)
 #                print(dat_fft_select.shape)
 #                print(dat_fft_select_ifft.shape)
-
+                
                 sum_dat_fft_select = []
                 sum_dat_fft = []
                 for typ in range(unique_types.shape[0]):
