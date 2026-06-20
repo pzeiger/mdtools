@@ -14,6 +14,7 @@ from pathlib import Path
 from scipy import signal
 
 
+dim2index = {'x': 0, 'y': 1, 'z':2}
 
 def mkdir_safe(directory):
     """
@@ -279,6 +280,8 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     nsplit = sampsnap_input['fftfreqsel']['nsplit']
     chunksize = sampsnap_input['fftfreqsel']['chunksize']
     alpha = sampsnap_input['fftfreqsel']['alpha']
+    dims = sampsnap_input['fftfreqsel']['dims']
+    frozen_dims = sampsnap_input['fftfreqsel']['frozen_dims']
    
     # Now we get the trajectory data
     data = trj.data
@@ -337,7 +340,7 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
     print('max deviation of mean pos from perfect crystal pos in y: %f', np.abs(pos0['yu']-equpos['yu']).max())
     print('max deviation of mean pos from perfect crystal pos in z: %f', np.abs(pos0['zu']-equpos['zu']).max())
     
-    # we get now the displacements only 
+    # we get now the displacements only
     data['xu'] = data['xu'] - pos0['xu']
     data['yu'] = data['yu'] - pos0['yu']
     data['zu'] = data['zu'] - pos0['zu']
@@ -402,14 +405,19 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 split_chunked_data = split_data[:,ach[0]:ach[1]]
 #                print(split_chunked_data.shape)
                 
-                tmp = np.moveaxis(np.array([split_chunked_data['xu'],
-                                            split_chunked_data['yu'],
-                                            split_chunked_data['zu']]), 0, 2)
+                tmp = np.array([split_chunked_data['xu'],
+                                split_chunked_data['yu'],
+                                split_chunked_data['zu']])
+                tmp = np.moveaxis(tmp, 0, 2)
                 
                 # We window the signal and rescale the spectrum to similar power
                 window = signal.windows.tukey(tmp.shape[0], alpha=alpha, sym=False)
                 
+                dat_fft = np.fft.rfft(tmp, axis=0)
+                print(dat_fft[:3])
+                
                 dat_fft = np.fft.rfft(tmp * window[:, np.newaxis, np.newaxis], axis=0)
+                print(dat_fft[:3])
                 norm = np.sum(np.abs(np.fft.rfft(tmp, axis=0))**2)
                 
 #                dat_fft *= np.sqrt(norm / np.sum(np.abs(dat_fft)**2))
@@ -447,10 +455,15 @@ def sample_snapshots_fftfreqsel(trj, sampsnap_input):
                 
                 sampled_snaps[:,ach[0]:ach[1]]['id'] = split_chunked_data['id'][indices,:]
                 sampled_snaps[:,ach[0]:ach[1]]['type'] = split_chunked_data['type'][indices,:]
-                sampled_snaps[:,ach[0]:ach[1]]['xu'] = dat_fft_select_ifft[indices,:,0] + pos0['xu'][ach[0]:ach[1]]
-                sampled_snaps[:,ach[0]:ach[1]]['yu'] = dat_fft_select_ifft[indices,:,1] + pos0['yu'][ach[0]:ach[1]]
-                sampled_snaps[:,ach[0]:ach[1]]['zu'] = dat_fft_select_ifft[indices,:,2] + pos0['zu'][ach[0]:ach[1]]
-            
+                
+                for d in ['x', 'y', 'z']:
+                    if d in dims:
+                        print(f'{d} in dims {dims}')
+                        sampled_snaps[:,ach[0]:ach[1]][f'{d}u'] = dat_fft_select_ifft[indices,:,dim2index[d]] + pos0[f'{d}u'][ach[0]:ach[1]]
+                    elif d in frozen_dims:
+                        sampled_snaps[:,ach[0]:ach[1]][f'{d}u'] = pos0[f'{d}u'][ach[0]:ach[1]]
+                    else:
+                        sampled_snaps[:,ach[0]:ach[1]][f'{d}u'] = data[f'{d}u'][indices,ach[0]:ach[1]] + pos0[f'{d}u'][ach[0]:ach[1]]
             
             tmp_data.append(sampled_snaps)
             
@@ -614,6 +627,8 @@ def process_input(inputfile):
         for el in sampsnap_input['fftfreqsel']:
             if el[0][0].lower() == 'n':
                 tmp[el[0]] = int(el[1])
+            elif el[0] == 'dims' or el[0] == 'frozen_dims':
+                tmp[el[0]] = [d for d in el[1].split(',')]
             else:
                 tmp[el[0]] = np.double(el[1])
         sampsnap_input['fftfreqsel'] = tmp
