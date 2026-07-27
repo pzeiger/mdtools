@@ -628,7 +628,10 @@ def process_input(inputfile):
             if el[0][0].lower() == 'n':
                 tmp[el[0]] = int(el[1])
             elif el[0] == 'dims' or el[0] == 'frozen_dims':
-                tmp[el[0]] = [d for d in el[1].split(',')]
+                if el[1].lower() == 'none':
+                    tmp[el[0]] = []
+                else:
+                    tmp[el[0]] = [d for d in el[1].split(',')]
             else:
                 tmp[el[0]] = np.double(el[1])
         sampsnap_input['fftfreqsel'] = tmp
